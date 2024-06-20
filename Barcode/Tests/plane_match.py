@@ -21,7 +21,8 @@ Install :
 import numpy as np
 import cv2 as cv
 import unittest
-
+from scipy.spatial.transform import Rotation as Rot
+import matplotlib.pyplot as plt
 
 # importing common Use modules 
 import sys 
@@ -51,52 +52,52 @@ def draw_cube(img, corners, imgpts):
     img = cv.drawContours(img, [imgpts[4:]],-1,(0,0,255),3)
     return img
 
-# Code from https://www.learnopencv.com/rotation-matrix-to-euler-angles/
-# Calculates rotation matrix to euler angles
-# The result is the same as MATLAB except the order
-# of the euler angles ( x and z are swapped ).
-def rotationMatrixToEulerAngles(R) :
+# # Code from https://www.learnopencv.com/rotation-matrix-to-euler-angles/
+# # Calculates rotation matrix to euler angles
+# # The result is the same as MATLAB except the order
+# # of the euler angles ( x and z are swapped ).
+# def rotationMatrixToEulerAngles(R) :
 
-    sy = np.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+#     sy = np.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
 
-    singular = sy < 1e-6
+#     singular = sy < 1e-6
 
-    if  not singular :
-        x = np.arctan2(R[2,1] , R[2,2])
-        y = np.arctan2(-R[2,0], sy)
-        z = np.arctan2(R[1,0], R[0,0])
-    else :
-        x = np.arctan2(-R[1,2], R[1,1])
-        y = np.arctan2(-R[2,0], sy)
-        z = 0
+#     if  not singular :
+#         x = np.arctan2(R[2,1] , R[2,2])
+#         y = np.arctan2(-R[2,0], sy)
+#         z = np.arctan2(R[1,0], R[0,0])
+#     else :
+#         x = np.arctan2(-R[1,2], R[1,1])
+#         y = np.arctan2(-R[2,0], sy)
+#         z = 0
 
-    theta = np.rad2deg(np.array([x, y, z]))
-    return theta
+#     theta = np.rad2deg(np.array([x, y, z]))
+#     return theta
 
 
-# Calculates Rotation Matrix given euler angles.
-def eulerAnglesToRotationMatrix(theta) :
+# # Calculates Rotation Matrix given euler angles.
+# def eulerAnglesToRotationMatrix(theta) :
 
-    theta = np.deg2rad(theta)
+#     theta = np.deg2rad(theta)
  
-    R_x = np.array([[1,         0,                  0                   ],
-                    [0,         np.cos(theta[0]), -np.sin(theta[0]) ],
-                    [0,         np.sin(theta[0]), np.cos(theta[0])  ]
-                    ])
+#     R_x = np.array([[1,         0,                  0                   ],
+#                     [0,         np.cos(theta[0]), -np.sin(theta[0]) ],
+#                     [0,         np.sin(theta[0]), np.cos(theta[0])  ]
+#                     ])
  
-    R_y = np.array([[np.cos(theta[1]),    0,      np.sin(theta[1])  ],
-                    [0,                     1,      0                   ],
-                    [-np.sin(theta[1]),   0,      np.cos(theta[1])  ]
-                    ])
+#     R_y = np.array([[np.cos(theta[1]),    0,      np.sin(theta[1])  ],
+#                     [0,                     1,      0                   ],
+#                     [-np.sin(theta[1]),   0,      np.cos(theta[1])  ]
+#                     ])
  
-    R_z = np.array([[np.cos(theta[2]),    -np.sin(theta[2]),    0],
-                    [np.sin(theta[2]),    np.cos(theta[2]),     0],
-                    [0,                     0,                      1]
-                    ])
+#     R_z = np.array([[np.cos(theta[2]),    -np.sin(theta[2]),    0],
+#                     [np.sin(theta[2]),    np.cos(theta[2]),     0],
+#                     [0,                     0,                      1]
+#                     ])
  
-    R = np.dot(R_z, np.dot( R_y, R_x ))
+#     R = np.dot(R_z, np.dot( R_y, R_x ))
  
-    return R
+#     return R
 
 #%% Main
 class PlaneMatcher:
@@ -113,13 +114,23 @@ class PlaneMatcher:
         # create some images for test
         if img_type == 1: # /
             w,h             = self.frame_size
-            self.img        = np.tile(np.linspace(100, 200, w), (h,1))
-            self.img        = np.uint8(self.img)
+            self.img        = np.tile(np.linspace(100, 300, w), (h,1))
 
         elif img_type == 2: # /\
             w,h             = self.frame_size
             self.img        = np.tile(np.linspace(100, 200, int(w/2)), (h,2))
-            self.img        = np.uint8(self.img)            
+         
+        elif img_type == 3: # |_|
+            w,h             = self.frame_size
+            self.img        = np.tile(np.linspace(100, 200, h).reshape((-1,1)), (1,w)) 
+        
+        elif img_type == 4: # /
+            w,h             = self.frame_size
+            self.img        = np.tile(np.linspace(1000, 500, w), (h,1))            
+
+        elif img_type == 10: # flat
+            w,h             = self.frame_size
+            self.img        = np.ones((h,w))*500             
 
         elif img_type == 11:
             "chess board"
@@ -132,40 +143,41 @@ class PlaneMatcher:
         elif img_type == 13:
             self.img = cv.imread('image_ddd_004.png')
             
+        #self.img        = np.uint8(self.img)       
         return self.img
       
     def init_roi(self, test_type = 1):
         "load the test case"
         if test_type == 1:
-            roi = [300,220,340,260] # xlu, ylu, xrb, yrb
-        else:
+            roi = [310,230,330,250] # xlu, ylu, xrb, yrb
+        elif test_type == 2:
             roi = [300,220,340,260] # xlu, ylu, xrb, yrb
         return roi  
 
 
     def init_img3d(self, img = None):
         "initializes xyz coordinates for each point"
-        img   = self.img if img is None else img
-        h,w   = img.shape[:2]
-        x     = np.arange(w)
-        y     = np.arange(h)
-        x,y   = np.meshgrid(x,y)
-        fx    = self.cam_matrix[0,0]
-        fy    = self.cam_matrix[1,1]
+        img     = self.img if img is None else img
+        h,w     = img.shape[:2]
+        x       = np.arange(w)
+        y       = np.arange(h)
+        x,y     = np.meshgrid(x,y)
+        fx      = self.cam_matrix[0,0]
+        fy      = self.cam_matrix[1,1]
         
-        xy    = np.hstack((x.reshape(-1,1),y.reshape(-1,1)))
-        xy    = np.expand_dims(xy, axis=1).astype(np.float32)
+        xy      = np.hstack((x.reshape(-1,1),y.reshape(-1,1)))
+        xy      = np.expand_dims(xy, axis=1).astype(np.float32)
         xy_undistorted = cv.undistortPoints(xy, self.cam_matrix, self.cam_distort)
 
-        u     = xy_undistorted[:,0,0].reshape((h,w))
-        v     = xy_undistorted[:,0,1].reshape((h,w))
-        z3d   = img.astype(np.float32)
-        x3d   = z3d.copy()
-        y3d   = z3d.copy()
+        u       = xy_undistorted[:,0,0].reshape((h,w))
+        v       = xy_undistorted[:,0,1].reshape((h,w))
+        z3d     = img.astype(np.float32)
+        x3d     = z3d.copy()
+        y3d     = z3d.copy()
 
         ii        = np.logical_and(z3d> 1e-6 , np.isfinite(z3d))
-        x3d[ii]   = u[ii]*z3d[ii]/fx
-        y3d[ii]   = v[ii]*z3d[ii]/fy
+        x3d[ii]   = u[ii]*z3d[ii] #/fx
+        y3d[ii]   = v[ii]*z3d[ii] #/fy
         z3d[ii]   = z3d[ii]
 
         #self.img3d = np.stack((u/fx,v/fy,z3d), axis = 2)
@@ -174,8 +186,8 @@ class PlaneMatcher:
     
     def compute_img3d(self, img = None):
         "compute xyz coordinates for each point using prvious init"
-        img   = self.img if img is None else img
-        xyz   = self.img3d
+        img         = self.img if img is None else img
+        xyz         = self.img3d
         if xyz is None:
             xyz = self.init_img3d(img)
 
@@ -186,10 +198,10 @@ class PlaneMatcher:
         imgXYZ      = self.img3d.copy()
 
         z3d         = img.astype(np.float32)
-        x3d         = self.img3d[:,:,0]  # u/f
-        y3d         = self.img3d[:,:,1]  # v/f
+        x3d         = self.img3d[:,:,0].copy()  # u/f
+        y3d         = self.img3d[:,:,1].copy()  # v/f
 
-        ii          = np.logical_and(z3d> 1e-6 , np.isfinite(z3d))
+        ii          = np.logical_and(z3d > 1e-6 , np.isfinite(z3d))
         x3d[ii]     = x3d[ii]*z3d[ii]
         y3d[ii]     = y3d[ii]*z3d[ii]
         z3d[ii]     = z3d[ii]
@@ -240,17 +252,19 @@ class PlaneMatcher:
         x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1))
 
         # using svd to make the fit
-        xyz1_matrix = np.hstack((x,y,z,z*0+1))
-        U, S, Vh    = np.linalg.svd(xyz1_matrix, full_matrices=False)
+        xyz1_matrix = np.hstack((x,y,z)) #,z*0+1))
+        tvec        = xyz1_matrix[:,:3].mean(axis=0)
+        xyz1_matrix = xyz1_matrix - tvec
+        U, S, Vh    = np.linalg.svd(xyz1_matrix, full_matrices=True)
         ii          = np.argmin(S)
-        vnorm       = Vh[:,ii]
+        vnorm       = Vh[ii,:]
 
         # checking error
         err_std     = self.check_error(xyz1_matrix, vnorm)
         print('Fit error : ', str(err_std))
 
         # forming output
-        tvec        = xyz1_matrix[:,:3].mean(axis=0)
+        #tvec        = xyz1_matrix[:,:3].mean(axis=0)
         #pose_norm   = np.hstack(tvec, vnorm.reshape((1,-1)))
         roi_params  = {'roi':roi, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }                               
         return roi_params
@@ -258,13 +272,21 @@ class PlaneMatcher:
     def convert_roi_params_to_pose(self, roi_params):
         "converting params to the pose vector"
         tvec       = roi_params['tvec'].reshape((1,-1))
-        vnorm      = roi_params['vnorm'].reshape((1,-1))
-        rvec       = vnorm[:3]
+        vnorm      = roi_params['vnorm']  # 4x1 vector
+        #rvec       = vnorm[:3].reshape((1,-1))
+        #rvec       = rvec/np.linalg.norm(rvec)
 
-        pose_norm  = np.hstack((tvec, rvec,[[10]]))
+        rvec       = vnorm.flatten() #reshape((-1,1))
+        #rvec[3]    = 0 # kill DC
+        rvec       = rvec/np.linalg.norm(rvec)
+
+        #R           = Rot.from_quat(rvec).as_matrix()
+        R           = Rot.from_rotvec(rvec).as_matrix()
+        avec        = Rot.from_matrix(R).as_euler('zyx',degrees=True)
+
+        pose_norm  = np.hstack((tvec, rvec.reshape((1,-1)),[[10]]))
         return pose_norm
 
-    
     def show_image_with_axis(self, img, poses = []):
         "draw results"
         axis_number = len(poses)
@@ -272,16 +294,16 @@ class PlaneMatcher:
             print('No poses found')
             
         # deal with black and white
-        if len(img.shape) > 2:
-            img_show = img.copy()
-        else:
-            img_show = cv.applyColorMap(img, cv.COLORMAP_JET)
+        img_show = np.uint8(img) #.copy()
+        if len(img.shape) < 3:
+            img_show = cv.applyColorMap(img_show, cv.COLORMAP_JET)
          
         for k in range(axis_number):
             
             avec    = poses[k][3:6] # orientation in degrees
             levl    = poses[k][6]   # level
-            R       = eulerAnglesToRotationMatrix(avec)
+            #R       = eulerAnglesToRotationMatrix(avec)
+            R       = Rot.from_euler('zyx',avec, degrees = True).as_matrix()
             rvec, _ = cv.Rodrigues(R)
             tvec    = np.array(poses[k][:3], dtype = np.float32).reshape(rvec.shape) # center of the patch
             img_show= draw_axis(img_show, rvec, tvec, self.cam_matrix, self.cam_distort, len = levl)
@@ -289,6 +311,28 @@ class PlaneMatcher:
         cv.imshow('Image & Axis', img_show)
         ch = cv.waitKey()
 
+    def show_points_3d_with_normal(sef, img3d, pose = None):
+        "display in 3D"
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+
+        xs,ys,zs       = img3d[:,:,0].reshape((-1,1)), img3d[:,:,1].reshape((-1,1)), img3d[:,:,2].reshape((-1,1))
+        ax.scatter(xs, ys, zs, marker='.')
+        
+        if pose is not None:
+            pose       = pose.flatten()
+            # R          = Rot.from_euler('zyx',pose[3:6],degrees=True).as_matrix()
+            # vnorm      = R[:,2]*pose[6]
+            vnorm      = pose[3:6].flatten()*pose[6]
+            xa, ya, za = [pose[0], pose[0]+vnorm[0]], [pose[1], pose[1]+vnorm[1]], [pose[2], pose[2]+vnorm[2]]
+            ax.plot(xa, ya, za, 'r', label='Normal')
+
+
+        ax.set_xlabel('X [mm]')
+        ax.set_ylabel('Y [mm]')
+        ax.set_zlabel('Z [mm]')
+        ax.set_aspect('equal', 'box')
+        plt.show()
 
     def test_image(self):
         "test single image depth"
@@ -333,30 +377,47 @@ class TestPlaneMatcher(unittest.TestCase):
         img     = p.init_image(1)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
-        self.assertFalse(imgXYZ is None)                  
+        self.assertFalse(imgXYZ is None)     
 
-    def test_FitPalne(self):
-        "computes normal to the ROI"
+    def test_ShowImg3d(self):
+        "XYZ point cloud structure init and compute"
         p       = PlaneMatcher()
         img     = p.init_image(1)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(1)
-        roip   = p.fit_plane(imgXYZ, roi)
+        x0,y0,x1,y1 = roi
+        roiXYZ    = imgXYZ[y0:y1,x0:x1,:]
+        p.show_points_3d_with_normal(roiXYZ)
+        self.assertFalse(imgXYZ is None)  
+                     
+
+    def test_FitPlane(self):
+        "computes normal to the ROI"
+        p       = PlaneMatcher()
+        img     = p.init_image(3)
+        img3d   = p.init_img3d(img)
+        imgXYZ  = p.compute_img3d(img)
+        roi     = p.init_roi(2)
+        roip    = p.fit_plane(imgXYZ, roi)
         pose    = p.convert_roi_params_to_pose(roip)
-        p.show_image_with_axis(p.img)
+        p.show_image_with_axis(p.img, pose)
+                
+        x0,y0,x1,y1 = roi
+        roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
+        p.show_points_3d_with_normal(roiXYZ, pose)
         self.assertFalse(roip['error'] > 0.01)  
 
-    def test_FitPalneFail(self):
+    def test_FitPlaneFail(self):
         "computes normal to the ROI but the image is bad at this location"
         p       = PlaneMatcher()
-        img     = p.init_image(2)
+        img     = p.init_image(10)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(1)
-        roip   = p.fit_plane(imgXYZ, roi)
+        roip    = p.fit_plane(imgXYZ, roi)
         pose    = p.convert_roi_params_to_pose(roip)
-        p.show_image_with_axis(p.img)
+        p.show_image_with_axis(p.img, pose)
         self.assertTrue(roip['error'] > 0.01)          
 
 # ----------------------
@@ -416,8 +477,10 @@ if __name__ == '__main__':
     #suite.addTest(TestPlaneMatcher("test_ChessPoseDetect")) # ok
     #suite.addTest(TestPlaneMatcher("test_InitImg3d")) # ok
     #suite.addTest(TestPlaneMatcher("test_ComputeImg3d")) # ok
-    suite.addTest(TestPlaneMatcher("test_FitPalne")) # 
-    suite.addTest(TestPlaneMatcher("test_FitPalneFail")) # 
+    #suite.addTest(TestPlaneMatcher("test_ShowImg3d")) # 
+    
+    suite.addTest(TestPlaneMatcher("test_FitPlane")) # 
+    #suite.addTest(TestPlaneMatcher("test_FitPlaneFail")) # 
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
