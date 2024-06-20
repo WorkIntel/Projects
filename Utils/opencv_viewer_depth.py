@@ -12,6 +12,7 @@ class RealSense(object):
     def __init__(self, size=None, mode = 'rgb', **params):
         
         self.frame_size = (1280, 720)
+        self.count = 0
         # if size is not None:
         #     w, h = map(int, size.split('x'))
         #     self.frame_size = (w, h)
@@ -52,9 +53,20 @@ class RealSense(object):
         # #self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         # #self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
         # Start streaming
-        self.pipeline.start(self.config)
+        profile = self.pipeline.start(self.config)
 
-        self.count = 0
+        
+
+        # Getting the depth sensor's depth scale (see rs-align example for explanation)
+        depth_sensor = profile.get_device().first_depth_sensor()
+        depth_scale = depth_sensor.get_depth_scale()
+        print("Depth Scale is: " , depth_scale)
+
+        # Create an align object
+        # rs.align allows us to perform alignment of depth frames to others frames
+        # The "align_to" is the stream type to which we plan to align depth frames.
+        align_to = rs.stream.color
+        self.align = rs.align(align_to)
 
     def render(self, dst):
         pass
@@ -65,8 +77,67 @@ class RealSense(object):
                #return
         self.mode = mode  
 
-
     def read(self, dst=None):
+        "with frame alignments"
+        w, h = self.frame_size
+
+        # Wait for a coherent pair of frames: depth and color
+        frames = self.pipeline.wait_for_frames()
+        # Align the depth frame to color frame
+        aligned_frames = self.align.process(frames)
+
+        # Get aligned frames
+        depth_frame = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
+        color_frame = aligned_frames.get_color_frame()
+        if not depth_frame or not color_frame:
+            return False, None
+
+        # Convert images to numpy arrays
+        depth_image = np.asanyarray(depth_frame.get_data())
+        color_image = np.asanyarray(color_frame.get_data())
+        #color_image = cv.cvtColor(depth_image, cv.COLOR_GRAY2RGB)
+        #depth_image = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+
+        # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+        depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.03)
+        depth_colormap  = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)
+
+        depth_colormap_dim = depth_colormap.shape
+        color_colormap_dim = color_image.shape
+
+        #If depth and color resolutions are different, resize color image to match depth image for display
+        if depth_colormap_dim != color_colormap_dim:
+            color_image = cv.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]), interpolation=cv.INTER_AREA)
+            #images = np.hstack((resized_color_image, depth_colormap))
+        # else:
+        #     images = np.hstack((color_image, depth_colormap))
+
+        # images = color_image
+
+        if self.mode == 'rgb':
+            image_out = color_image
+        elif self.mode == 'ddd':
+            image_out = depth_colormap
+        elif self.mode == 'rgd':
+            image_out = np.concatenate((color_image[:,:,:2], depth_scaled[:,:,np.newaxis] ), axis = 2)
+        elif self.mode == 'gd':
+            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+            image_out = np.concatenate((gray_image, depth_scaled ), axis = 1)
+        elif self.mode == 'ggd':
+            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+            image_out = np.stack((gray_image, gray_image, depth_scaled ), axis = 2)            
+        elif self.mode == 'gdd':
+            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+            image_out = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
+        elif self.mode == 'scl':
+            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
+            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
+        elif self.mode == 'dep':
+            image_out  = depth_image                    
+        return True, image_out
+
+    def read__not_aligned(self, dst=None):
+        "color and depth are not aligned"
         w, h = self.frame_size
 
         # Wait for a coherent pair of frames: depth and color

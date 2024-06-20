@@ -138,10 +138,16 @@ class PlaneMatcher:
             self.img        = cv.imread(fname)
 
         elif img_type == 12:
-            self.img = cv.imread('image_scl_001.png')
+            self.img = cv.imread('image_scl_001.png', cv.IMREAD_GRAYSCALE)
+            self.img = cv.resize(self.img , dsize = self.frame_size) 
             
         elif img_type == 13:
-            self.img = cv.imread('image_ddd_004.png')
+            self.img = cv.imread('image_ddd_000.png', cv.IMREAD_GRAYSCALE)
+            self.img = cv.resize(self.img , dsize = self.frame_size) 
+
+        elif img_type == 14:
+            self.img = cv.imread('image_ddd_004.png', cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)          
             
         #self.img        = np.uint8(self.img)       
         return self.img
@@ -284,7 +290,8 @@ class PlaneMatcher:
         R           = Rot.from_rotvec(rvec).as_matrix()
         avec        = Rot.from_matrix(R).as_euler('zyx',degrees=True)
 
-        pose_norm  = np.hstack((tvec, rvec.reshape((1,-1)),[[10]]))
+        levl        = 0.1*tvec[0,2]
+        pose_norm  = np.hstack((tvec, rvec.reshape((1,-1)),[[levl]]))
         return pose_norm
 
     def show_image_with_axis(self, img, poses = []):
@@ -420,6 +427,22 @@ class TestPlaneMatcher(unittest.TestCase):
         p.show_image_with_axis(p.img, pose)
         self.assertTrue(roip['error'] > 0.01)          
 
+    def test_FitPlaneDepthImage(self):
+        "computes normal to the ROI"
+        p       = PlaneMatcher()
+        img     = p.init_image(13)
+        img3d   = p.init_img3d(img)
+        imgXYZ  = p.compute_img3d(img)
+        roi     = p.init_roi(2)
+        roip    = p.fit_plane(imgXYZ, roi)
+        pose    = p.convert_roi_params_to_pose(roip)
+        p.show_image_with_axis(p.img, pose)
+                
+        x0,y0,x1,y1 = roi
+        roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
+        p.show_points_3d_with_normal(roiXYZ, pose)
+        self.assertFalse(roip['error'] > 0.01)  
+
 # ----------------------
 #%% App
 class App:
@@ -479,8 +502,9 @@ if __name__ == '__main__':
     #suite.addTest(TestPlaneMatcher("test_ComputeImg3d")) # ok
     #suite.addTest(TestPlaneMatcher("test_ShowImg3d")) # 
     
-    suite.addTest(TestPlaneMatcher("test_FitPlane")) # 
+    #suite.addTest(TestPlaneMatcher("test_FitPlane")) # ok
     #suite.addTest(TestPlaneMatcher("test_FitPlaneFail")) # 
+    suite.addTest(TestPlaneMatcher("test_FitPlaneDepthImage")) #
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
