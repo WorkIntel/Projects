@@ -22,12 +22,21 @@ import numpy as np
 import cv2 as cv
 import unittest
 from scipy.spatial.transform import Rotation as Rot
-import matplotlib.pyplot as plt
+from scipy import interpolate 
+
 
 # importing common Use modules 
 import sys 
 sys.path.append(r'C:\Users\udubin\Documents\Projects\Utils')
 from opencv_viewer_depth import RealSense
+
+import logging as log
+log.basicConfig(stream=sys.stdout, level=log.DEBUG, format='[%(asctime)s.%(msecs)03d] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',  datefmt="%M:%S")
+log.getLogger('matplotlib.font_manager').disabled = True
+log.getLogger('matplotlib').setLevel(log.WARNING)
+log.getLogger('PIL').setLevel(log.WARNING)
+
+import matplotlib.pyplot as plt
 
 #%% Helpers
 def draw_axis(img, rvec, tvec, cam_mtrx, cam_dist, len = 10):
@@ -109,27 +118,49 @@ class PlaneMatcher:
         self.cam_distort= np.array([0,0,0,0,0],dtype = np.float32)
 
         self.img3d      = None # contains x,y and depth plains
+        self.imgXYZ     = None  # comntains X,Y,Z information after depth image to XYZ transform
+
+        # params
+        self.MIN_SPLIT_SIZE  = 8
+        self.MIN_STD_ERROR   = 0.01
+
 
     def init_image(self, img_type = 1):
         # create some images for test
+        w,h             = self.frame_size
         if img_type == 1: # /
-            w,h             = self.frame_size
+            
             self.img        = np.tile(np.linspace(100, 300, w), (h,1))
 
         elif img_type == 2: # /\
-            w,h             = self.frame_size
+
             self.img        = np.tile(np.linspace(100, 200, int(w/2)), (h,2))
          
         elif img_type == 3: # |_|
-            w,h             = self.frame_size
+
             self.img        = np.tile(np.linspace(100, 200, h).reshape((-1,1)), (1,w)) 
         
         elif img_type == 4: # /
-            w,h             = self.frame_size
-            self.img        = np.tile(np.linspace(1000, 500, w), (h,1))            
+
+            self.img        = np.tile(np.linspace(1000, 500, w), (h,1))        
+
+        elif img_type == 5: # dome
+
+            x,y             = np.meshgrid(np.arange(w),np.arange(h))   
+            self.img        = (np.abs(x - w/2) + np.abs(y - h/2))/10 + 200 # less slope
+
+        elif img_type == 6: # sphere
+
+            x,y             = np.meshgrid(np.arange(w),np.arange(h))   
+            self.img        = np.sqrt((x - w/2)**2 + (y - h/2)**2)/10 + 200 # less slope   
+
+        elif img_type == 7: # stair
+
+            x,y             = np.meshgrid(np.arange(w),np.arange(h))   
+            self.img        = (np.sign(x - w/2) + np.sign(y - h/2))*2 + 200 # less slope                     
 
         elif img_type == 10: # flat
-            w,h             = self.frame_size
+
             self.img        = np.ones((h,w))*500             
 
         elif img_type == 11:
@@ -146,18 +177,32 @@ class PlaneMatcher:
             self.img = cv.resize(self.img , dsize = self.frame_size) 
 
         elif img_type == 14:
-            self.img = cv.imread('image_ddd_004.png', cv.IMREAD_GRAYSCALE)  
-            self.img = cv.resize(self.img , dsize = self.frame_size)          
+            self.img = cv.imread('image_ddd_001.png', cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)     
+
+        elif img_type == 15:
+            self.img = cv.imread('image_ddd_002.png', cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)     
+
+        elif img_type == 16:
+            self.img = cv.imread('image_ddd_003.png', cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)                            
             
         #self.img        = np.uint8(self.img)       
         return self.img
       
     def init_roi(self, test_type = 1):
         "load the test case"
+        roi = [0,0,self.frame_size[0],self.frame_size[1]]
         if test_type == 1:
             roi = [310,230,330,250] # xlu, ylu, xrb, yrb
         elif test_type == 2:
             roi = [300,220,340,260] # xlu, ylu, xrb, yrb
+        elif test_type == 3:
+            roi = [280,200,360,280] # xlu, ylu, xrb, yrb            
+        elif test_type == 4:
+            roi = [220,140,420,340] # xlu, ylu, xrb, yrb      
+        
         return roi  
 
 
@@ -216,6 +261,8 @@ class PlaneMatcher:
         imgXYZ[:,:,0] = x3d
         imgXYZ[:,:,1] = y3d
         imgXYZ[:,:,2] = z3d
+
+        self.imgXYZ = imgXYZ
         return imgXYZ
 
     def detect_pose_in_chessboard(self): 
@@ -251,10 +298,22 @@ class PlaneMatcher:
         err_std     = err.std()
         return err_std
     
-    def fit_plane(self, img3d, roi):
+    def fit_plane(self, roi):
         "computes normal for the specifric roi and evaluates error"
         x0,y0,x1,y1 = roi
-        roi3d       = img3d[y0:y1,x0:x1,:]
+
+        # reduce size of the grid for speed
+        roi_area    = (x1-x0)*(y1-y0)
+        step_size   = np.maximum(1,int(np.sqrt(roi_area)/20))
+
+        #tck = interpolate.bisplrep(x, y, z, s=0)
+        #znew = interpolate.bisplev(xnew, ynew, tck)
+        roi3d       = self.imgXYZ[y0:y1:step_size,x0:x1:step_size,:]   
+        if roi3d .shape[0] < 5:
+            self.tprint('Too small region: %d' %step_size)
+            step_size   = 1
+            roi3d       = self.imgXYZ[y0:y1:step_size,x0:x1:step_size,:]   
+
         x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1))
 
         # using svd to make the fit
@@ -265,15 +324,63 @@ class PlaneMatcher:
         ii          = np.argmin(S)
         vnorm       = Vh[ii,:]
 
+        # keep orientation
+        vnorm       = vnorm*np.sign(vnorm[2])
+
         # checking error
         err_std     = self.check_error(xyz1_matrix, vnorm)
-        print('Fit error : ', str(err_std))
+        self.tprint('Fit error : %s' %str(err_std))
 
         # forming output
         #tvec        = xyz1_matrix[:,:3].mean(axis=0)
         #pose_norm   = np.hstack(tvec, vnorm.reshape((1,-1)))
         roi_params  = {'roi':roi, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }                               
         return roi_params
+    
+    def split_roi_recursively(self, roi, level = 0):
+        # splits ROI on 4 regions and recursevly call 
+        x0,y0,x1,y1     = roi
+        #roi3d           = self.imgXYZ[y0:y1,x0:x1,:]   
+        self.tprint('Processing level %d, region x = %d, y = %d' %(level,x0,y0))
+        # check the current fit
+        roi_params_f    = self.fit_plane(roi)
+        roi_params_ret  = [roi_params_f]
+        if roi_params_f['error'] < self.MIN_STD_ERROR:
+            self.tprint('Fit is good enough x = %d, y = %d' %(x0,y0))
+            return roi_params_ret
+
+        # too small exit
+        xs, ys          = int((x1 + x0)/2), int((y1 + y0)/2)
+        if (xs - x0) < self.MIN_SPLIT_SIZE or (ys - y0) < self.MIN_SPLIT_SIZE:
+            self.tprint('Min size is reached x = %d, y = %d' %(x0,y0))
+            return roi_params_ret
+        
+        # 4 ROIs - accept the split if error of one of them is lower from the total
+        roi_params_list = []
+        roi_split   = [[x0,y0,xs,ys],[x0,ys,xs,y1],[xs,y0,x1,ys],[xs,ys,x1,y1]]
+        for roi_s in roi_split:
+            roi_params_prev = self.split_roi_recursively(roi_s, level + 1)
+            # save locally
+            #roi_params_list.append(roi_params_prev)
+            roi_params_list = roi_params_list + roi_params_prev
+            
+        # extract each of the below and check the error
+        makeTheSplit = False
+        for roi_params_s in roi_params_list:
+            #roi_params_s       = roi_params_prev[-1]
+            # accept the split if twice lower (if noise of 4 split should be 2)
+            if roi_params_s['error'] < roi_params_f['error']/2:
+                makeTheSplit = True
+                break
+
+        # decide what to return
+        if makeTheSplit:
+            roi_params_ret = roi_params_list
+            self.tprint('Split at level %d, region x = %d, y = %d' %(level,x0,y0))
+        else:
+            self.tprint('No split level %d, region x = %d, y = %d' %(level,x0,y0))
+
+        return roi_params_ret
     
     def convert_roi_params_to_pose(self, roi_params):
         "converting params to the pose vector"
@@ -292,7 +399,8 @@ class PlaneMatcher:
 
         levl        = 0.1*tvec[0,2]
         pose_norm  = np.hstack((tvec, rvec.reshape((1,-1)),[[levl]]))
-        return pose_norm
+        #self.tprint('roi to pose')
+        return pose_norm.flatten()
 
     def show_image_with_axis(self, img, poses = []):
         "draw results"
@@ -316,9 +424,10 @@ class PlaneMatcher:
             img_show= draw_axis(img_show, rvec, tvec, self.cam_matrix, self.cam_distort, len = levl)
 
         cv.imshow('Image & Axis', img_show)
+        self.tprint('show done')
         ch = cv.waitKey()
 
-    def show_points_3d_with_normal(sef, img3d, pose = None):
+    def show_points_3d_with_normal(self, img3d, pose = None):
         "display in 3D"
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
@@ -340,6 +449,54 @@ class PlaneMatcher:
         ax.set_zlabel('Z [mm]')
         ax.set_aspect('equal', 'box')
         plt.show()
+
+    def show_rois_3d_with_normals(self, roi_params_ret = [], roi_init = None):
+        "display in 3D each ROI region with split"
+        
+        if len(roi_params_ret) < 1:
+            self.tprint('roi_params_ret is empty')
+            return
+
+        # extract the initial ROI - to make the show more compact
+        roi_init       = [0,0,self.frame_size[1], self.frame_size[0]] if roi_init is None else roi_init
+        x0,y0,x1,y1    = roi_init
+
+        if self.imgXYZ is None:
+            self.tprint('Need init')
+            return      
+
+        img3d          = self.imgXYZ[y0:y1,x0:x1,:] 
+        xs,ys,zs       = img3d[:,:,0].reshape((-1,1)), img3d[:,:,1].reshape((-1,1)), img3d[:,:,2].reshape((-1,1))
+
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(xs, ys, zs, marker='.')
+        
+        for roi_p in roi_params_ret:
+            pose       = self.convert_roi_params_to_pose(roi_p)
+            # R          = Rot.from_euler('zyx',pose[3:6],degrees=True).as_matrix()
+            # vnorm      = R[:,2]*pose[6]
+            vnorm      = pose[3:6].flatten()*pose[6]
+            #self.tprint(str(vnorm))
+            xa, ya, za = [pose[0], pose[0]+vnorm[0]], [pose[1], pose[1]+vnorm[1]], [pose[2], pose[2]+vnorm[2]]
+            ax.plot(xa, ya, za, 'r', label='Normal')
+
+
+        ax.set_xlabel('X [mm]')
+        ax.set_ylabel('Y [mm]')
+        ax.set_zlabel('Z [mm]')
+        ax.set_aspect('equal', 'box')
+        plt.show() #block=False)        
+
+    def tprint(self, txt = '', level = 'I'):
+        if level == "I":
+            log.info(txt)
+        elif level == "W":
+            log.warning(txt)
+        elif level == "E":
+            log.error(txt)
+        else:
+            log.info(txt)
 
     def test_image(self):
         "test single image depth"
@@ -398,11 +555,10 @@ class TestPlaneMatcher(unittest.TestCase):
         p.show_points_3d_with_normal(roiXYZ)
         self.assertFalse(imgXYZ is None)  
                      
-
     def test_FitPlane(self):
         "computes normal to the ROI"
         p       = PlaneMatcher()
-        img     = p.init_image(3)
+        img     = p.init_image(5)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(2)
@@ -442,6 +598,20 @@ class TestPlaneMatcher(unittest.TestCase):
         roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
         p.show_points_3d_with_normal(roiXYZ, pose)
         self.assertFalse(roip['error'] > 0.01)  
+
+    def test_RoiSplit(self):
+        "computes ROIS and splits if needed"
+        p       = PlaneMatcher()
+        p.MIN_STD_ERROR = 0.1
+        img     = p.init_image(7)
+        roi     = p.init_roi(4)
+        img3d   = p.init_img3d(img)
+        imgXYZ  = p.compute_img3d(img)
+        roi_list= p.split_roi_recursively(roi)
+        p.show_rois_3d_with_normals(roi_list, roi)
+
+        for roi_s in roi_list:
+            self.assertFalse(roi_s['error'] > 0.01)
 
 # ----------------------
 #%% App
@@ -504,7 +674,9 @@ if __name__ == '__main__':
     
     #suite.addTest(TestPlaneMatcher("test_FitPlane")) # ok
     #suite.addTest(TestPlaneMatcher("test_FitPlaneFail")) # 
-    suite.addTest(TestPlaneMatcher("test_FitPlaneDepthImage")) #
+    #suite.addTest(TestPlaneMatcher("test_FitPlaneDepthImage")) #
+
+    suite.addTest(TestPlaneMatcher("test_RoiSplit")) 
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
