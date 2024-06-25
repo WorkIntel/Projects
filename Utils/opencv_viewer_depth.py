@@ -210,7 +210,7 @@ class RealSense(object):
             if ret is False:
                 break
         
-            cv.imshow('frame (c,d,1,g,s,f,h: q - to exit)', frame)
+            cv.imshow('frame (c,a,d,1,g,s,f,h: q - to exit)', frame)
             ch = cv.waitKey(10) & 0xff
             if ch == ord('q'):
                 break

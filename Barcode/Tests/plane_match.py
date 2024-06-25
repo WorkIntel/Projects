@@ -121,7 +121,7 @@ class PlaneMatcher:
         self.imgXYZ     = None  # comntains X,Y,Z information after depth image to XYZ transform
 
         # params
-        self.MIN_SPLIT_SIZE  = 8
+        self.MIN_SPLIT_SIZE  = 32
         self.MIN_STD_ERROR   = 0.01
 
 
@@ -132,7 +132,7 @@ class PlaneMatcher:
             
             self.img        = np.tile(np.linspace(100, 300, w), (h,1))
 
-        elif img_type == 2: # /\
+        elif img_type == 2: # /|/
 
             self.img        = np.tile(np.linspace(100, 200, int(w/2)), (h,2))
          
@@ -140,9 +140,9 @@ class PlaneMatcher:
 
             self.img        = np.tile(np.linspace(100, 200, h).reshape((-1,1)), (1,w)) 
         
-        elif img_type == 4: # /
+        elif img_type == 4: # /\
 
-            self.img        = np.tile(np.linspace(1000, 500, w), (h,1))        
+            self.img        = np.tile(np.hstack((np.linspace(300, 500, w>>1),np.linspace(500, 300, w>>1))), (h,1))        
 
         elif img_type == 5: # dome
 
@@ -157,7 +157,7 @@ class PlaneMatcher:
         elif img_type == 7: # stair
 
             x,y             = np.meshgrid(np.arange(w),np.arange(h))   
-            self.img        = (np.sign(x - w/2) + np.sign(y - h/2))*2 + 200 # less slope                     
+            self.img        = (np.sign(x - w/2) + np.sign(y - h/2))*5 + 200 # less slope                     
 
         elif img_type == 10: # flat
 
@@ -558,7 +558,7 @@ class TestPlaneMatcher(unittest.TestCase):
     def test_FitPlane(self):
         "computes normal to the ROI"
         p       = PlaneMatcher()
-        img     = p.init_image(5)
+        img     = p.init_image(4)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(2)
@@ -603,7 +603,7 @@ class TestPlaneMatcher(unittest.TestCase):
         "computes ROIS and splits if needed"
         p       = PlaneMatcher()
         p.MIN_STD_ERROR = 0.1
-        img     = p.init_image(7)
+        img     = p.init_image(15)
         roi     = p.init_roi(4)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
