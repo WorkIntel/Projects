@@ -21,6 +21,9 @@ import numpy as np
 import cv2 as cv
 
 # local modules
+# importing common Use modules 
+import sys 
+sys.path.append(r'C:\Users\udubin\Documents\Projects\Utils')
 from common import RectSelector
 from opencv_viewer_depth import RealSense
 
@@ -52,12 +55,15 @@ class NoiseApp:
 
     def statistics(self, frame):
 
-        minv = frame.min()
-        maxv = frame.max()
-        avg  = frame.mean()
-        stdv  = frame.std()
-        locv = np.any(np.isnan(frame))
-        print(f'Stat : {minv:.2f}:{avg:.2f}:{maxv:.2f} - std {stdv:.2f}3f. Has None {locv}')
+        ii  = frame < 2**15 # 65535 - None
+
+        isok = np.any(np.isfinite([frame[ii]]))
+        minv = frame[ii].min()
+        maxv = frame[ii].max()
+        avg  = frame[ii].mean()
+        stdv  = frame[ii].std()
+        locv = len(frame) - len(ii) #np.any(np.isnan(frame[ii]))
+        print(f'Stat : {minv:.2f}:{avg:.2f}:{maxv:.2f} - std {stdv:.2f}3f. Has None {locv}, is finite {isok}')
 
 
     def on_rect(self, rect):
@@ -88,14 +94,15 @@ class NoiseApp:
 
     def show_scene(self, err_std):
         "draw scene and ROI"
-        vis = self.frame.copy()
+        vis     = self.frame.copy()
         #vis = cv.cvtColor(self.frame, cv.COLOR_GRAY2RGB)
-        vis    = cv.convertScaleAbs(self.frame, alpha=0.03)
+        vis     = cv.convertScaleAbs(self.frame, alpha=0.03)
         self.rect_sel.draw(vis)
 
         if self.rect is not None:
             x0, y0, x1, y1 = self.rect
-            vis = cv.rectangle(vis, (x0, y0), (x1, y1), (0, 255, 0), 2)
+            clr = (0, 0, 0) if vis[y0:y1,x0:x1].mean() > 128 else (240,240,240)
+            vis = cv.rectangle(vis, (x0, y0), (x1, y1), clr, 2)
             vis = draw_str(vis,(x0,y0-10),str(err_std))
 
         return vis
@@ -113,7 +120,7 @@ class NoiseApp:
             err_std = self.process_image(frame)
 
             vis     = self.show_scene(err_std)
-            cv.imshow('Noise', vis)
+            cv.imshow('Noise (Esc - Exit)', vis)
             ch = cv.waitKey(1)
             if ch == ord(' '):
                 self.paused = not self.paused

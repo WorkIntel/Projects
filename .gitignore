@@ -7,3 +7,4 @@
 *.pptx
 /Safety/Doc
 *.webm
+Barcode/Tests/_opencv_viewer_depth.py

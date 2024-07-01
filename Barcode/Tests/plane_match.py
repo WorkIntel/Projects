@@ -124,6 +124,9 @@ class PlaneMatcher:
         self.MIN_SPLIT_SIZE  = 32
         self.MIN_STD_ERROR   = 0.01
 
+        # help variable
+        self.ang_vec     = np.zeros((3,1))  # help variable
+
 
     def init_image(self, img_type = 1):
         # create some images for test
@@ -173,20 +176,24 @@ class PlaneMatcher:
             self.img = cv.resize(self.img , dsize = self.frame_size) 
             
         elif img_type == 13:
-            self.img = cv.imread('image_ddd_000.png', cv.IMREAD_GRAYSCALE)
+            self.img = cv.imread(r"C:\Data\Depth\Plane\image_ddd_000.png", cv.IMREAD_GRAYSCALE)
             self.img = cv.resize(self.img , dsize = self.frame_size) 
 
         elif img_type == 14:
-            self.img = cv.imread('image_ddd_001.png', cv.IMREAD_GRAYSCALE)  
+            self.img = cv.imread(r"C:\Data\Depth\Plane\image_ddd_001.png", cv.IMREAD_GRAYSCALE)  
             self.img = cv.resize(self.img , dsize = self.frame_size)     
 
         elif img_type == 15:
-            self.img = cv.imread('image_ddd_002.png', cv.IMREAD_GRAYSCALE)  
+            self.img = cv.imread(r"C:\Data\Depth\Plane\image_ddd_002.png", cv.IMREAD_GRAYSCALE)  
             self.img = cv.resize(self.img , dsize = self.frame_size)     
 
         elif img_type == 16:
-            self.img = cv.imread('image_ddd_003.png', cv.IMREAD_GRAYSCALE)  
-            self.img = cv.resize(self.img , dsize = self.frame_size)                            
+            self.img = cv.imread(r"C:\Data\Depth\Plane\image_ddd_003.png", cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)     
+
+        elif img_type == 21:
+            self.img = cv.imread(r"C:\Data\Depth\Plane\image_scl_000.png", cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)                                     
             
         #self.img        = np.uint8(self.img)       
         return self.img
@@ -394,8 +401,9 @@ class PlaneMatcher:
         rvec       = rvec/np.linalg.norm(rvec)
 
         #R           = Rot.from_quat(rvec).as_matrix()
-        R           = Rot.from_rotvec(rvec).as_matrix()
-        avec        = Rot.from_matrix(R).as_euler('zyx',degrees=True)
+        #R           = Rot.from_rotvec(rvec).as_matrix()
+        #avec        = Rot.from_matrix(R).as_euler('zyx',degrees=True)
+        #self.ang_vec= avec
 
         levl        = 0.1*tvec[0,2]
         pose_norm  = np.hstack((tvec, rvec.reshape((1,-1)),[[levl]]))
@@ -421,6 +429,34 @@ class PlaneMatcher:
             R       = Rot.from_euler('zyx',avec, degrees = True).as_matrix()
             rvec, _ = cv.Rodrigues(R)
             tvec    = np.array(poses[k][:3], dtype = np.float32).reshape(rvec.shape) # center of the patch
+            img_show= draw_axis(img_show, rvec, tvec, self.cam_matrix, self.cam_distort, len = levl)
+
+        cv.imshow('Image & Axis', img_show)
+        self.tprint('show done')
+        ch = cv.waitKey()
+
+    def show_image_with_rois(self, img, roi_params_ret = []):
+        "draw results by projecting ROIs on image"
+
+        axis_number = len(roi_params_ret)
+        if axis_number < 1:
+            print('No poses found')
+            
+        # deal with black and white
+        img_show = np.uint8(img) #.copy()
+        if len(img.shape) < 3:
+            img_show = cv.applyColorMap(img_show, cv.COLORMAP_JET)
+         
+        for roi_p in roi_params_ret:
+
+            pose    = self.convert_roi_params_to_pose(roi_p)            
+            
+            avec    = pose[3:6] # orientation in degrees
+            levl    = pose[6]   # level
+            #R       = eulerAnglesToRotationMatrix(avec)
+            R       = Rot.from_euler('zyx',avec, degrees = True).as_matrix()
+            rvec, _ = cv.Rodrigues(R)
+            tvec    = np.array(pose[:3], dtype = np.float32).reshape(rvec.shape) # center of the patch
             img_show= draw_axis(img_show, rvec, tvec, self.cam_matrix, self.cam_distort, len = levl)
 
         cv.imshow('Image & Axis', img_show)
@@ -602,13 +638,14 @@ class TestPlaneMatcher(unittest.TestCase):
     def test_RoiSplit(self):
         "computes ROIS and splits if needed"
         p       = PlaneMatcher()
-        p.MIN_STD_ERROR = 0.1
-        img     = p.init_image(15)
+        p.MIN_STD_ERROR = 0.3
+        img     = p.init_image(3)
         roi     = p.init_roi(4)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi_list= p.split_roi_recursively(roi)
         p.show_rois_3d_with_normals(roi_list, roi)
+        p.show_image_with_rois(p.img, roi_list)
 
         for roi_s in roi_list:
             self.assertFalse(roi_s['error'] > 0.01)

@@ -125,10 +125,10 @@ class RealSense(object):
             image_out = np.concatenate((gray_image, depth_scaled ), axis = 1)
         elif self.mode == 'ggd':
             gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out = np.stack((gray_image, gray_image, depth_scaled ), axis = 2)            
+            image_out   = np.stack((gray_image, gray_image, depth_scaled ), axis = 2)            
         elif self.mode == 'gdd':
             gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
+            image_out       = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
         elif self.mode == 'scl':
             depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
             image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
