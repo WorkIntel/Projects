@@ -3,8 +3,9 @@
 *.pdf
 *.pyc
 *.png
-*.jp
+*.jpg
 *.pptx
 /Safety/Doc
 *.webm
 Barcode/Tests/_opencv_viewer_depth.py
+/Barcode/trial
