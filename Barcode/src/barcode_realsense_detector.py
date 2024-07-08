@@ -7,94 +7,50 @@ Debug module that simulates detection
 -----------------------------
  Ver    Date     Who    Descr
 -----------------------------
-1761   24.10.23 UD     Trying 
+0101   01.07.24  UD     Created 
 -----------------------------
 """
 
-#import matplotlib as mpl
-#mpl.use('Qt5Agg')
-#mpl.interactive = False
 import cv2
-#import time
-#import pylab as m
-#import pose6d._myutils as my
 import numpy as np
 import copy
 try:
     from pyzbar.pyzbar import decode , ZBarSymbol
 except:
-    print('Warn : Barcode lib is not found on not installed.')
+    print('Warning : Barcode lib is not found on not installed.')
     decode , ZBarSymbol = None, None
 
+# ----------------------------------------
+class ObjectAbstract:
+    """
+    standard abstract type for the RealSense object
+    mostly defines output and data representation
+    """
+    def __init__(self):
+            
+        self.name          = 'general'
+        self.id            = 1  # many different object
+        self.pose          = np.zeros((6,1))  # Tx,Ty,Tz in mm and Rx, Ry Rz in degrees
+        self.quality       = 0  # quality between 0-1
 
-import pickle
-import bz2
 
-#from skimage.feature import peak_local_max
-#import yaml
-#import logging
+# ----------------------------------------
+class ObjectBarcode(ObjectAbstract):
 
-
-
-
-class ObjectBarcode:
     """ 
+    Creates and manage barcode detector
 
     """
 
     def __init__(self):
             
-
         self.name          = 'barcode'
-        
         self.code           = [] # barcode array
         self.no_library     = decode is None
-        
-        
         self.debugOn        = False
-        
-
 
     
-    def load(self,filename):
-        #  from utils 
-        with bz2.BZ2File(filename, 'r') as f: return(pickle.load(f)) 
-
-    def load_camera_config(self,file_name):
-        calib                   = self.load(file_name)
-
-
-    def pose6d_detect_objects_after_nnet(self, rgb_image, objects):
-        """
-        detect  barcodes after nnet detection
-        
-        """
-
-                  
-        code, rgb_image             = self.detect_barcode(rgb_image, objects)
-        self.code                   = code
-        barcode_num                 = len(code)
-        if barcode_num < 1:
-            #self.Print("Failed to find barcode" , 'W')
-            return objects
-        
-        barcode_txt                    = code[0].data.decode ('utf-8')
-        
-        # compute pose in x and y
-        (x, y, w, h)                   = code[0].rect
-        
-         
-        #rvec, tvec          = self.get_object_pose(self.pattern_points, corners, self.camera_matrix, self.dist_coeffs)        
-      
-        objects['objectId']            = [barcode_txt]
-        #objects['rvecAll']             = [np.zeros((3,1))]
-        #objects['tvecAll']             = [np.array([x,y,0]).reshape((3,1))]
-        objects['objectQ']             = [1]  # reliable
-        objects['objectText']          = ['barcode']  # reliable
-                
-        return objects  
-    
-    def pose6d_detect_objects(self,rgb_image, objects = None):
+    def detect_objects_old(self, rgb_image, objects = None):
         
         """
         detect multiple barcodes - select one which is in the middle of the page
@@ -137,17 +93,23 @@ class ObjectBarcode:
                 
         return objects        
     
-    def pose6d_detect_objects_old(self, rgb_image):
+    def detect_objects(self, rgb_image):
         """
         detect multiple barcodes
         
         """
+
+        # select object to work with
+        objects = {'objectId': [], 'rvecAll': [], 'tvecAll': [], 'objectQ': [], 'objectText': []}
+        if self.no_library:
+            self.Print("Failed to find barcode library",'E' )
+            return objects        
         
         code, rgb_image             = self.detect_barcode(rgb_image)
         self.code                   = code
         if len(code)<1:
             #self.Print("Failed to find barcode" , 'W')
-            return False
+            return objects
         
         barcode_txt                    = code[0].data.decode ('utf-8')
         
@@ -190,6 +152,7 @@ class ObjectBarcode:
 
         
         img     = frame_rgb
+
         # read the image in numpy array using cv2
         #img         = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         #blur        = cv2.GaussianBlur(img, (5, 5), 0) 
@@ -213,22 +176,17 @@ class ObjectBarcode:
         #self.draw_image(img_rot, code)
 
         return code, img    
-    
 
-        
-    
     def draw_image(self, color_image, barcode = []):
         # show image and barcode
-        
         color_image = self.draw_barcode(color_image, 1, barcode)
-        
         cv2.imshow('Barcode Image',color_image)
         cv2.waitKey(100)
 
         return color_image
     
     def rotate_image(self, img, rot_ang):
-        # rotate image by degrees
+        # rotate image by degrees to simplify detection
         h, w        = img.shape[0], img.shape[1]
         degree      = rot_ang
         R           = cv2.getRotationMatrix2D((w / 2, h / 2), degree, 1)
@@ -247,20 +205,14 @@ class ObjectBarcode:
             # Locate the barcode position in image
             (x, y, w, h) = barcode.rect 
             # correct for subregion
-            #x           += self.region_start_x
-            #y           += self.region_start_y
-            
-            
             x, y, w, h   = int(x * scaleFactor), int(y * scaleFactor), int(w * scaleFactor), int(h * scaleFactor)
-            
-
             
             # Put the rectangle in image using
             # cv2 to highlight the barcode
             cv2.rectangle(color_image, (x-10, y-10), (x + w+10, y + h+10),  (0, 255, 255), 2)
             cv2.putText(color_image, (barcode.data.decode ('utf-8')), (x-100, y-20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA, False)
             
-            if barcode.data!="" and self.debugOn:
+            if barcode.data !="" and self.debugOn:
             
                 # Print the barcode data
                 print(barcode.data.decode ('utf-8'))
@@ -269,9 +221,6 @@ class ObjectBarcode:
               
         # support resize
         return color_image
-    
-
- 
     
     def Print(self, txt='',level='I'):
         
@@ -287,14 +236,15 @@ class ObjectBarcode:
            
         print(ptxt)
     
-        
+# ----------------------------------------        
+# Tests
+# ----------------------------------------
 
 def test_image():
+    "read barcodes from images"
     import glob
     barcode_list         = []
-    #img_list            = glob.glob(r'D:\RobotAI\Design\env\dlcdev-bup\Lib\site-packages\pyzbar\tests\*.png')
-    img_list            = glob.glob(r'D:\RobotAI\Customers\WiseTech\Doc\*.jpg')
-    #img_list            = glob.glob(r'D:\RobotAI\Customers\RobotAI\Barcode\videos\*.jpg')
+    img_list            = glob.glob(r'..\data\*.jpg')
     oBarCode            = ObjectBarcode()
     
     for i, img_name in enumerate(img_list):
@@ -339,12 +289,8 @@ def test_camera():
             break 
         
 def test_video():
-    #fname               = r'D:\RobotAI\Customers\Inditex\Objects\Barcode_01\videos\object_0006.mp4'
-    #fname               = r'D:\RobotAI\Customers\Inditex\Basler_a2A1920-51gcBAS__40349726__20231019_170512104.avi'
-    #fname               = r'file:///D:/RobotAI/Customers/WiseTech/Doc/barcode_0010.mp4'
-    #fname               = r'file:///D:/RobotAI/Customers/Inditex/basler_barcode.avi'
+
     fname               = r'file:///D:/Users/zion/Downloads/fixture_aruco_test (1).avi'
-    
     cap                 = cv2.VideoCapture(fname)
     oBarCode            = ObjectBarcode()
     
@@ -368,24 +314,13 @@ def test_video():
             break 
 
     cv2.destroyAllWindows() 
-    print('Video done')       
-     
-# -------------------------- 
-if __name__ == '__main__':
-    print(__doc__)
+    print('Video done')   
 
-    #test_camera() # ok
-    #test_video()
-    #test_image()
-
-
-    ###############################################
-    ##      Open CV and Numpy integration        ##
-    ###############################################
-
+def test_camera_realsense():
+    """
+    Real Sense camera connect
+    """
     import pyrealsense2 as rs
-    import numpy as np
-    import cv2
 
     # Configure depth and color streams
     pipeline = rs.pipeline()
@@ -444,14 +379,14 @@ if __name__ == '__main__':
             #     images = np.hstack((resized_color_image, depth_colormap))
             # else:
             #     images = np.hstack((color_image, depth_colormap))
-            images = color_image
+            images          = color_image
 
             # Show images
             #cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
             #cv2.imshow('RealSense', images)
             #cv2.waitKey(1)
 
-            objects         = oBarCode.pose6d_detect_objects(images)
+            objects         = oBarCode.detect_objects(images)
             img             = oBarCode.draw_barcode(images)
              
         
@@ -464,5 +399,13 @@ if __name__ == '__main__':
 
         # Stop streaming
         pipeline.stop()
-
     
+     
+# -------------------------- 
+if __name__ == '__main__':
+    print(__doc__)
+
+    #test_camera() # ok
+    #test_video()
+    #test_image()
+    test_camera_realsense()
