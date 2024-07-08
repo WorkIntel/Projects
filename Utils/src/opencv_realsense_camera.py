@@ -1,7 +1,7 @@
 ## Works with old sensor.
 
 ###############################################
-##      Open CV and Numpy integration        ##
+##     Real Sense Camera Object Similar to OepnCV
 ###############################################
 
 import pyrealsense2 as rs
@@ -65,8 +65,12 @@ class RealSense(object):
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
         # The "align_to" is the stream type to which we plan to align depth frames.
-        align_to = rs.stream.color
+        align_to   = rs.stream.color
         self.align = rs.align(align_to)
+
+        # record video
+        self.vout       = None
+        self.record_on  = False # toggle recording
 
     def render(self, dst):
         pass
@@ -78,17 +82,17 @@ class RealSense(object):
         self.mode = mode  
 
     def read(self, dst=None):
-        "with frame alignments"
+        "with frame alignments and color space transformations"
         w, h = self.frame_size
 
         # Wait for a coherent pair of frames: depth and color
-        frames = self.pipeline.wait_for_frames()
+        frames          = self.pipeline.wait_for_frames()
         # Align the depth frame to color frame
-        aligned_frames = self.align.process(frames)
+        aligned_frames  = self.align.process(frames)
 
         # Get aligned frames
-        depth_frame = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
-        color_frame = aligned_frames.get_color_frame()
+        depth_frame     = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
+        color_frame     = aligned_frames.get_color_frame()
         if not depth_frame or not color_frame:
             return False, None
 
@@ -130,13 +134,16 @@ class RealSense(object):
             gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
             image_out       = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
         elif self.mode == 'scl':
-            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
+            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.05)
             image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
+        elif self.mode == 'sc2':
+            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
+            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)          
         elif self.mode == 'dep':
             image_out  = depth_image                    
         return True, image_out
 
-    def read__not_aligned(self, dst=None):
+    def read_not_aligned(self, dst=None):
         "color and depth are not aligned"
         w, h = self.frame_size
 
@@ -185,24 +192,64 @@ class RealSense(object):
             gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
             image_out = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
         elif self.mode == 'scl':
+            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.05)
+            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)  
+        elif self.mode == 'sc2':
             depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
-            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
+            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)                
         elif self.mode == 'dep':
             image_out  = depth_image                    
         return True, image_out
 
     def isOpened(self):
+        "OpenCV compatability"
         return True
     
     def save_image(self, frame):
-        fn = '.\image_%s_%03d.png' % (self.mode, self.count)
+        fn = '.\\image_%s_%03d.png' % (self.mode, self.count)
         cv.imwrite(fn, frame)
         print(fn, 'saved')
         self.count += 1   
-    
+
+    def record_video(self, frame):
+        # record video to a file is switched on
+        if (self.vout is None) and (self.record_on is True):
+            fourcc  = cv.VideoWriter_fourcc(*'mp4v')
+            fname   = '.\\video_%s.mp4' % (self.mode)
+            self.vout     = cv.VideoWriter(fname, fourcc, 20.0, self.frame_size)
+            print('Writing video to file %s' %fname)
+            self.count = 0
+
+        # write frame
+        if (self.vout is not None) and (self.record_on is True):
+            self.vout.write(frame)
+            self.count += 1  
+            if self.count % 100 == 0:
+                print('Writing frame %s' %str(self.count))
+
+        # record on is switched off
+        if (self.vout is not None) and (self.record_on is False):
+            self.vout.release()
+            self.vout = None
+            print('Video file created')
+
+    def record_release(self):
+        "finish record"         
+        if self.vout is not None:
+            self.vout.release()
+            self.vout = None
+            print('Video file created')
+
     def close(self):
+        # stop record
+        self.record_release()
+
         # Stop streaming
         self.pipeline.stop()
+
+    def release(self):
+        "opencv compatability"
+        self.close()
 
     def test(self):
         while True:
@@ -210,15 +257,15 @@ class RealSense(object):
             if ret is False:
                 break
         
-            cv.imshow('frame (c,a,d,1,g,s,f,h: q - to exit)', frame)
+            cv.imshow('frame (c,a,d,1,2,g,s,f,h,r: q - to exit)', frame)
             ch = cv.waitKey(10) & 0xff
             if ch == ord('q'):
                 break
-            elif ch == ord('c'):
+            elif ch == ord('c'): # regular RGB image
                 self.change_mode('rgb')
-            elif ch == ord('d'):
+            elif ch == ord('d'): # depth image
                 self.change_mode('ddd')            
-            elif ch == ord('g'):
+            elif ch == ord('g'): # concatenated g and d
                 self.change_mode('gd') 
             elif ch == ord('b'):
                 self.change_mode('rgd') 
@@ -227,11 +274,19 @@ class RealSense(object):
             elif ch == ord('a'):
                 self.change_mode('gdd')     
             elif ch == ord('1'):
-                self.change_mode('scl')                            
+                self.change_mode('scl')  
+            elif ch == ord('2'):
+                self.change_mode('sc2')                                           
             elif ch == ord('h'):
                 self.change_mode('dep') 
             elif ch == ord('s'):
                 self.save_image(frame) 
+            elif ch == ord('r'):
+                self.record_on = not self.record_on
+                print('Video record %s' %str(self.record_on))
+                
+            # check if record is required
+            self.record_video(frame)   
 
         if ret is False:
             print('Failed to read image')
