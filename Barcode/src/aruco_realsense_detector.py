@@ -4,8 +4,9 @@ import sys
  
  # importing common Use modules 
 import sys 
-sys.path.append(r'C:\Users\udubin\Documents\Projects\Utils')
-from opencv_viewer_depth import RealSense
+sys.path.append(r'..\Utils\src')
+from opencv_realsense_camera import RealSense
+
 
 # Project: ArUco Marker Detector
 # Date created: 12/18/2021
