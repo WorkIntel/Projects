@@ -1,4 +1,4 @@
-# Intel RealSense Object Camera
+# Intel RealSense Object Camera - DPC
 
 Objects are everywhere!
 
