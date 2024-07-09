@@ -1,4 +1,4 @@
-# Intel RealSense Object Camera
+# Intel RealSense Object Camera - DPC
 
 Objects are everywhere!
 
@@ -9,25 +9,37 @@ In some objects depth and RGB information are used.
 
 The list of the supported objects
 
--  Barcodes, QR Codes, Aruco Markers - well defined objects detected by using RGB data and some known packages.
+-  Barcodes, QR Codes, Aruco Markers - well defined objects detected by using RGB data. Click on each image to find out more.
 
 Barcodes   | QR Codes | Aruco Markers |
 :------------: |  :----------: | :-------------:  |
-[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![Aruco](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
+[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![Aruco](Barcode/doc/aruco_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  |
 
-Depth Sensing | Object Detection in 2D | Body Tracking |
+-  Planes, Edges, Corners - 3D depth objects detected by using Depth data. Click on each image to find out more.
+
+Planes | Edges | Corners |
 :------------: |  :----------: | :-------------:  |
 [![Depth Sensing](https://user-images.githubusercontent.com/32394882/230639409-356b8dfa-df66-4bc2-84d8-a25fd0229779.gif)](https://www.stereolabs.com/docs/depth-sensing)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
 
-Positional Tracking | Global Localization | Spatial Mapping |
+-  General Object Detection - well defined objects detected by using Depth data. Click on each image to find out more.
+
+Planes | Object Detection in 2D | Body Tracking |
+:------------: |  :----------: | :-------------:  |
+[![Depth Sensing](https://user-images.githubusercontent.com/32394882/230639409-356b8dfa-df66-4bc2-84d8-a25fd0229779.gif)](https://www.stereolabs.com/docs/depth-sensing)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
+
+# Applications
+
+User level applications supported by the Camera software
+
+Region Detection | Object Counting | Object Tracking |
 :------------: |  :----------: | :-------------:  |
 [![Positional Tracking](https://user-images.githubusercontent.com/32394882/229093429-a445e8ae-7109-4995-bc1d-6a27a61bdb60.gif)](https://www.stereolabs.com/docs/positional-tracking/) | [![Global Localization](https://user-images.githubusercontent.com/32394882/230602944-ed61e6dd-e485-4911-8a4c-d6c9e4fab0fd.gif)](/global%20localization) | [![Spatial Mapping](https://user-images.githubusercontent.com/32394882/229099549-63ca7832-b7a2-42eb-9971-c1635d205b0c.gif)](https://www.stereolabs.com/docs/spatial-mapping) |
 
-Camera Control | Plane Detection | Multi Camera Fusion |
+VSLAM/Localization | Plane Detection | Fall Detection |
 :------------: |  :----------: | :-------------:  |
 [![Camera Control](https://user-images.githubusercontent.com/32394882/230602616-6b57c351-09c4-4aba-bdec-842afcc3b2ea.gif)](https://www.stereolabs.com/docs/video/camera-controls/) | [![Plane Detection](https://user-images.githubusercontent.com/32394882/229093072-d9d70e92-07d5-46cb-bde7-21f7c66fd6a1.gif)](https://www.stereolabs.com/docs/spatial-mapping/plane-detection/)  | [![Multi Camera Fusion](https://user-images.githubusercontent.com/32394882/228791106-a5f971d8-8d6f-483b-9f87-7f0f0025b8be.gif)](/fusion) |
 
 # Request Camera Feature
-[https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform]
+If you want to run the application or object detection on the camera hardware - check this [Link](https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform).
 
 
