@@ -33,6 +33,12 @@ class ObjectAbstract:
         self.pose          = np.zeros((6,1))  # Tx,Ty,Tz in mm and Rx, Ry Rz in degrees
         self.quality       = 0  # quality between 0-1
 
+    def get_object_data(self):
+        "read object data"
+        object_data        = {'name':self.name, 'id':self.id, 'pose':self.pose,'quality':self.quality}
+        return object_data
+
+
 
 # ----------------------------------------
 class ObjectBarcode(ObjectAbstract):
