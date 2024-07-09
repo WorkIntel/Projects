@@ -9,13 +9,13 @@ In some objects depth and RGB information are used.
 
 The list of the supported objects
 
--  Barcodes, QR Codes, Aruco Markers - well defined objects detected by using RGB data and some known packages. Click on each image to find out more.
+-  Barcodes, QR Codes, Aruco Markers - well defined objects detected by using RGB data. Click on each image to find out more.
 
 Barcodes   | QR Codes | Aruco Markers |
 :------------: |  :----------: | :-------------:  |
 [![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![Aruco](Barcode/doc/aruco_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  |
 
--  Planes, Edges, Corners - well defined objects detected by using Depth data. Click on each image to find out more.
+-  Planes, Edges, Corners - 3D depth objects detected by using Depth data. Click on each image to find out more.
 
 Planes | Edges | Corners |
 :------------: |  :----------: | :-------------:  |
