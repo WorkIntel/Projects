@@ -13,7 +13,7 @@ The list of the supported objects
 
 Barcodes   | QR Codes | Aruco Markers |
 :------------: |  :----------: | :-------------:  |
-[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif](https://github.com/IntelRealSense/librealsense)  | [![QR Codes](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
+[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![QR Codes](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
 
 Depth Sensing | Object Detection in 2D | Body Tracking |
 :------------: |  :----------: | :-------------:  |
