@@ -31,7 +31,7 @@ Motion Detection/Safety | Object Detection in 2D | Body Tracking |
 
 3D Pose Estimation | Object Detection in 2D | Body Tracking |
 :------------: |  :----------: | :-------------:  |
-[![Pose6D](https://github.com/WorkIntel/Projects/blob/main/Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)] (https://github.com/WorkIntel/Projects/blob/main/Pose6D/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
+[![Pose6D](https://github.com/WorkIntel/Projects/blob/main/Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Pose6D/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
 
 
 # Applications
