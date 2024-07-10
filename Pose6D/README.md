@@ -9,13 +9,16 @@
 This demo shows implementation of 6 DoF pose estimation based on RGB only and known object.
 The code is available from RobotAI site ([https://wwww.robotai.info](https://www.robotai.info/))
 
--   Estimate Background : estimates background using multiple gaussian models
--   Detection  : estimates regions that will be detected as intrusions
+-   6D Pose estimation : estimates translation and rotation of knwon objects
+-   Accuracy  : depends on the distance from the sensor
 
 This code could be integrated in your robotics and video processing pipe line.
- 
 
-## Installation Windows
+## Installation Windows/Ubuntu
+
+1. Install Pose6D executable from RobotAI
+
+## Usage
 
 1. install Pose6D executable:
 2. Connect to RealSense camera
@@ -24,10 +27,6 @@ This code could be integrated in your robotics and video processing pipe line.
 5. Train AI model
 6. Run Pose6D software to detect the object in real time
 
-## Usage
-
-
-
 ## Test
 
-
+Start Pose6D server and connect to it.
