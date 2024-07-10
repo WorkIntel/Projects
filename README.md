@@ -13,7 +13,7 @@ The list of the supported objects
 
 Barcodes   | QR Codes | Aruco Markers |
 :------------: |  :----------: | :-------------:  |
-[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  | [![Aruco](Barcode/doc/aruco_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/IntelRealSense/librealsense)  |
+[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  | [![Aruco](Barcode/doc/aruco_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  |
 
 -  Planes, Edges, Corners - 3D depth objects detected by using Depth data. Click on each image to find out more.
 
@@ -26,6 +26,13 @@ Planes | Edges | Corners |
 Motion Detection/Safety | Object Detection in 2D | Body Tracking |
 :------------: |  :----------: | :-------------:  |
 [![Safety](https://github.com/WorkIntel/Projects/blob/main/Safety/doc/motion_detection-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Safety/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
+
+-  3D Pose estimation from RGB and depth data. Click on each image to find out more.
+
+3D Pose Estimation | Object Detection in 2D | Body Tracking |
+:------------: |  :----------: | :-------------:  |
+[![Pose6D](https://github.com/WorkIntel/Projects/blob/main/Safety/doc/motion_detection-ezgif.com-video-to-gif-converter.gif)] (https://github.com/WorkIntel/Projects/blob/main/Pose6D/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Body Tracking](https://user-images.githubusercontent.com/32394882/230631989-24dd2b58-2c85-451b-a4ed-558d74d1b922.gif)](https://www.stereolabs.com/docs/body-tracking)  |
+
 
 # Applications
 
