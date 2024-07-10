@@ -1,7 +1,6 @@
-![](data/show_examples.jpg)
+![](doc/planes.png)
 
 [![image](https://img.shields.io/pypi/v/scikit-spatial.svg)](https://pypi.python.org/pypi/scikit-spatial)
-[![image](https://anaconda.org/conda-forge/scikit-spatial/badges/version.svg)](https://anaconda.org/conda-forge/scikit-spatial)
 
 
 # Introduction
@@ -10,10 +9,10 @@ This code provides examples of the using RealSense camera for detection of RGB a
 The following objects are supported:
 
 -   Planes : detected multiple planes in the depth image
--   Edges  : using OpenCV
+-   Edges  : detecting edges / intersection of planes 
+-   Corners: 3 plane intersection/ junctions
 
 These objects could be integrated in your robotics and video processing pipe line.
- 
 
 
 ## Installation Windows
@@ -24,8 +23,8 @@ These objects could be integrated in your robotics and video processing pipe lin
 ## Usage
 
 ```py
->>> from skspatial.objects import Vector
+>>> from Planes import plane_detector
 
->>> vector = Vector([2, 0, 0])
+>>> pd = plane_detector()
 
 ```
