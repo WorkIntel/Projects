@@ -1,15 +1,34 @@
-## Works with old sensor.
 
-###############################################
-##     Real Sense Camera Object Similar to OepnCV
-###############################################
+'''
+OpenCV like wrapper for Real Sense Camera
+
+==================
+
+Allows to store video and images in different formats and RGB - Depth combinations
+
+
+Usage:
+    python opencv_realsense_camera.py 
+    will run the camera and open the image window with live stream.
+    Use keys outlines in test() function to switch different modes
+    Press 's' to save the current image
+    Press 'r' to start recording and one more time 'r' to stop video recording
+                                        
+
+Environemt : 
+    C:\\Users\\udubin\\Documents\\Envs\\barcode
+
+Install : 
+
+
+'''
 
 import pyrealsense2 as rs
 import numpy as np
 import cv2 as cv
 
 class RealSense(object):
-    def __init__(self, size=None, mode = 'rgb', **params):
+    def __init__(self,  mode = 'rgb', size=None, **params):
         
         self.frame_size = (1280, 720)
         self.count = 0
@@ -22,7 +41,7 @@ class RealSense(object):
 
         # Configure depth and color streams
         self.pipeline = rs.pipeline()
-        self.config = rs.config()
+        self.config   = rs.config()
         #print(rs.__version__)
         #self.pipe = rs.pipeline()
         #self.cfg = rs.config()
@@ -55,8 +74,6 @@ class RealSense(object):
         # Start streaming
         profile = self.pipeline.start(self.config)
 
-        
-
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
         depth_scale = depth_sensor.get_depth_scale()
@@ -65,8 +82,8 @@ class RealSense(object):
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
         # The "align_to" is the stream type to which we plan to align depth frames.
-        align_to   = rs.stream.color
-        self.align = rs.align(align_to)
+        align_to        = rs.stream.color
+        self.align      = rs.align(align_to)
 
         # record video
         self.vout       = None
@@ -80,10 +97,11 @@ class RealSense(object):
                print(f'Not supported mode = {mode}')
                #return
         self.mode = mode  
+        print(f'Current mode {mode}')
 
     def read(self, dst=None):
         "with frame alignments and color space transformations"
-        w, h = self.frame_size
+        w, h            = self.frame_size
 
         # Wait for a coherent pair of frames: depth and color
         frames          = self.pipeline.wait_for_frames()
@@ -97,8 +115,8 @@ class RealSense(object):
             return False, None
 
         # Convert images to numpy arrays
-        depth_image = np.asanyarray(depth_frame.get_data())
-        color_image = np.asanyarray(color_frame.get_data())
+        depth_image     = np.asanyarray(depth_frame.get_data())
+        color_image     = np.asanyarray(color_frame.get_data())
         #color_image = cv.cvtColor(depth_image, cv.COLOR_GRAY2RGB)
         #depth_image = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
 
