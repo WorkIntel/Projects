@@ -439,7 +439,7 @@ class TestBackgroundEstimator(unittest.TestCase):
     def test_TrainingDetection(self):
         "show video and integrate over time upto 5 sec and then stop integration and do detect"
         p       = background_estimator()
-        srcid   = 2  # 2 - detect gray and depth, 3 - only depth
+        srcid   = 1  # 2 - detect gray and depth, 3 - only depth
         ret     = p.init_video(srcid)
         p.run_video_integration(str(srcid))
         p.finish()

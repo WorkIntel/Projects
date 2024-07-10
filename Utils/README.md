@@ -36,6 +36,6 @@ You can use Conda, Miniconda or other package managers.
 ```py
 >>> from opencv_realsense_camera import RealSense
 
->>> vector = Vector([2, 0, 0])
+>>> rs_cap = RealSense('rgb')
 
 ```
