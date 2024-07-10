@@ -7,7 +7,7 @@
 # Introduction
 
 This demo shows implementation of 6 DoF pose estimation based on RGB only and known object.
-The code is available from RobotAI site (https://wwww.robotai.info)
+The code is available from RobotAI site ([https://wwww.robotai.info](https://www.robotai.info/))
 
 -   Estimate Background : estimates background using multiple gaussian models
 -   Detection  : estimates regions that will be detected as intrusions
