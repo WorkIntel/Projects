@@ -5,7 +5,7 @@
 *.png
 *.jpg
 *.pptx
-/Safety/Doc
 *.webm
+*.json
 Barcode/Tests/_opencv_viewer_depth.py
 /Barcode/trial
