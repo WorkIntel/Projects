@@ -1,4 +1,4 @@
-![](data/show_examples.jpg)
+[![Pose6D](https://github.com/WorkIntel/Projects/blob/main/Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)]
 
 [![image](https://img.shields.io/pypi/v/scikit-spatial.svg)](https://pypi.python.org/pypi/scikit-spatial)
 
