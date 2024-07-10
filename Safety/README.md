@@ -34,4 +34,5 @@ Theis code could be integrated in your robotics and video processing pipe line.
 ## Test
 
 In your environment run:
+
 python  safety_detector.py
