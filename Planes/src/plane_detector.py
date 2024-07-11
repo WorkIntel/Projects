@@ -108,7 +108,7 @@ def draw_cube(img, corners, imgpts):
 #     return R
 
 #%% Main
-class PlaneMatcher:
+class PlaneDetector:
     def __init__(self):
 
         self.frame_size = (640,480)
@@ -550,7 +550,7 @@ class PlaneMatcher:
 
 # ----------------------
 #%% Tests
-class TestPlaneMatcher(unittest.TestCase):
+class TestPlaneDetector(unittest.TestCase):
     def test_Convert(self):
         avec = np.random.randint(-180,180, size = (1,3)).flatten().astype(np.float32)
         R    = eulerAnglesToRotationMatrix(avec)
@@ -558,7 +558,7 @@ class TestPlaneMatcher(unittest.TestCase):
         self.assertTrue(np.all(np.abs(avec - bvec) < 1e-6))
 
     def test_ImageShow(self):
-        p = PlaneMatcher()
+        p = PlaneDetector()
         p.init_image(1)
         poses = [[0,0,100,0,0,45,20]]
         p.show_image_with_axis(p.img,poses)
@@ -566,7 +566,7 @@ class TestPlaneMatcher(unittest.TestCase):
 
     def test_ChessPoseDetect(self):
         "understand pose ecomputations"
-        p = PlaneMatcher()
+        p = PlaneDetector()
         p.init_image(11)
         poses = p.detect_pose_in_chessboard()
         p.show_image_with_axis(p.img, poses)
@@ -574,14 +574,14 @@ class TestPlaneMatcher(unittest.TestCase):
 
     def test_InitImg3d(self):
         "XYZ point cloud structure init"
-        p = PlaneMatcher()
+        p = PlaneDetector()
         p.init_image(1)
         img3d = p.init_img3d()
         self.assertFalse(img3d is None)    
 
     def test_ComputeImg3d(self):
         "XYZ point cloud structure init and compute"
-        p       = PlaneMatcher()
+        p       = PlaneDetector()
         img     = p.init_image(1)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -589,7 +589,7 @@ class TestPlaneMatcher(unittest.TestCase):
 
     def test_ShowImg3d(self):
         "XYZ point cloud structure init and compute"
-        p       = PlaneMatcher()
+        p       = PlaneDetector()
         img     = p.init_image(1)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -601,7 +601,7 @@ class TestPlaneMatcher(unittest.TestCase):
                      
     def test_FitPlane(self):
         "computes normal to the ROI"
-        p       = PlaneMatcher()
+        p       = PlaneDetector()
         img     = p.init_image(4)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -617,7 +617,7 @@ class TestPlaneMatcher(unittest.TestCase):
 
     def test_FitPlaneFail(self):
         "computes normal to the ROI but the image is bad at this location"
-        p       = PlaneMatcher()
+        p       = PlaneDetector()
         img     = p.init_image(10)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -629,7 +629,7 @@ class TestPlaneMatcher(unittest.TestCase):
 
     def test_FitPlaneDepthImage(self):
         "computes normal to the ROI"
-        p       = PlaneMatcher()
+        p       = PlaneDetector()
         img     = p.init_image(13)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -645,7 +645,7 @@ class TestPlaneMatcher(unittest.TestCase):
 
     def test_RoiSplit(self):
         "computes ROIS and splits if needed"
-        p       = PlaneMatcher()
+        p       = PlaneDetector()
         p.MIN_STD_ERROR = 0.1
         img     = p.init_image(18)
         roi     = p.init_roi(3)
@@ -667,7 +667,7 @@ class App:
 
         self.frame = None
         self.paused = False
-        self.tracker = PlaneMatcher()
+        self.tracker = PlaneDetector()
 
         cv.namedWindow('plane')
 
@@ -710,18 +710,18 @@ if __name__ == '__main__':
 
     #unittest.main()
     suite = unittest.TestSuite()
-    #suite.addTest(TestPlaneMatcher("test_Convert"))
-    #suite.addTest(TestPlaneMatcher("test_ImageShow"))
-    #suite.addTest(TestPlaneMatcher("test_ChessPoseDetect")) # ok
-    #suite.addTest(TestPlaneMatcher("test_InitImg3d")) # ok
-    #suite.addTest(TestPlaneMatcher("test_ComputeImg3d")) # ok
-    #suite.addTest(TestPlaneMatcher("test_ShowImg3d")) # 
+    #suite.addTest(TestPlaneDetector("test_Convert"))
+    #suite.addTest(TestPlaneDetector("test_ImageShow"))
+    #suite.addTest(TestPlaneDetector("test_ChessPoseDetect")) # ok
+    #suite.addTest(TestPlaneDetector("test_InitImg3d")) # ok
+    #suite.addTest(TestPlaneDetector("test_ComputeImg3d")) # ok
+    #suite.addTest(TestPlaneDetector("test_ShowImg3d")) # 
     
-    #suite.addTest(TestPlaneMatcher("test_FitPlane")) # ok
-    #suite.addTest(TestPlaneMatcher("test_FitPlaneFail")) # 
-    #suite.addTest(TestPlaneMatcher("test_FitPlaneDepthImage")) #
+    #suite.addTest(TestPlaneDetector("test_FitPlane")) # ok
+    #suite.addTest(TestPlaneDetector("test_FitPlaneFail")) # 
+    #suite.addTest(TestPlaneDetector("test_FitPlaneDepthImage")) #
 
-    suite.addTest(TestPlaneMatcher("test_RoiSplit")) 
+    suite.addTest(TestPlaneDetector("test_RoiSplit")) 
    
     runner = unittest.TextTestRunner()
     runner.run(suite)

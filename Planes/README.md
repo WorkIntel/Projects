@@ -10,21 +10,21 @@ The following objects are supported:
 
 -   Planes : detected multiple planes in the depth image
 -   Edges  : detecting edges / intersection of planes 
--   Corners: 3 plane intersection/ junctions
+-   Corners: three plane intersection/ junctions
 
 These objects could be integrated in your robotics and video processing pipe line.
 
 
 ## Installation Windows
 
-1. install python and virtual environment:
+1. install python and virtual environment: similar to barcode
 2. 
 
 ## Usage
 
 ```py
->>> from Planes import plane_detector
+>>> from plane_detector import PlaneDetector
 
->>> pd = plane_detector()
+>>> pd = PlaneDetector()
 
 ```
