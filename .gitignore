@@ -9,4 +9,4 @@
 *.json
 Barcode/Tests/_opencv_viewer_depth.py
 /Barcode/trial
-/MonoDepth/
+/MonoDepth/data
