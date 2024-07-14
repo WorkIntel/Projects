@@ -214,7 +214,8 @@ class ObjectChess:
         # which pairs are used to measure distances
         point_ids           = [[0,                      self.pattern_size[0]*(self.pattern_size[1]-1)],
                                [self.pattern_size[0]-1, self.pattern_size[0]*self.pattern_size[1]-1  ]]
-
+        point_ids           = [[0,                      self.pattern_size[0]*(self.pattern_size[1]-1)],
+                               [self.pattern_size[0]-4, self.pattern_size[0]*self.pattern_size[1]-4  ]]
         corner_list         = []
 
         for i, img_name in enumerate(img_list):
@@ -260,6 +261,7 @@ if __name__ == '__main__':
 
     objChess     = ObjectChess()
     filePath     = r'C:\Users\udubin\Documents\Projects\MonoDepth\data\chess\*.*'
+    filePath     = r'C:\Users\udubin\Documents\Projects\MonoDepth\data\chess_china\*.*'
     #objChess.run_pose_estimation(filePath) # ok
     objChess.compute_point_distances(filePath)
 
