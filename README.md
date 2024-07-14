@@ -61,13 +61,13 @@ The following is the check list of supported environments and functionality:
 
 We greatly appreciate contributions from the community, including examples, applications, and guides. If you'd like to contribute, please follow these guidelines:
 
-1. **Create a pull request (PR)** with the title prefix `[RS]`, adding your new example folder to the `examples/` directory within the repository.
+1. **Create a pull request (PR)** with the title prefix `[RS]`, adding your new example folder to the `root/` directory within the repository.
 
 2. **Ensure your project adheres to the following standards:**
    - Makes use of the `vision` package.
    - Includes a `README.md` with clear instructions for setting up and running the example.
    - Avoids adding large files or dependencies unless they are absolutely necessary for the example.
-   - Contributors should be willing to provide support for their examples and address related issues.
+
 
 
 
