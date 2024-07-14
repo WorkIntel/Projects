@@ -4,7 +4,8 @@ Objects are everywhere!
 
 This package supports object data extraction from the intel Realsense camera RGB or Depth streams in real time.
 
-The list of the supported objects and applications are below. Click on each image to find out more.
+The list of the supported objects, frameworks, platforms and applications are below. Click on each image to find out more.
+
 # Objects
 
 -  Barcodes, QR Codes, Aruco Markers - well defined objects detected by using RGB data. 
@@ -45,7 +46,7 @@ VSLAM/Localization | Plane Detection | Fall Detection |
 [![Camera Control](https://user-images.githubusercontent.com/32394882/230602616-6b57c351-09c4-4aba-bdec-842afcc3b2ea.gif)](https://www.stereolabs.com/docs/video/camera-controls/) | [![Plane Detection](https://user-images.githubusercontent.com/32394882/229093072-d9d70e92-07d5-46cb-bde7-21f7c66fd6a1.gif)](https://www.stereolabs.com/docs/spatial-mapping/plane-detection/)  | [![Multi Camera Fusion](https://user-images.githubusercontent.com/32394882/228791106-a5f971d8-8d6f-483b-9f87-7f0f0025b8be.gif)](/fusion) |
 
 # Request Camera Feature
-If you want to run the application or object detection on the camera hardware - check this [Link](https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform).
+If you want to run the application or object detection on the camera hardware - check this [link](https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform).
 
 # Supported Platforms and Compute Environments
 
