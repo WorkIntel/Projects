@@ -7,6 +7,8 @@
 *.pptx
 *.webm
 *.json
+*.avi
 Barcode/Tests/_opencv_viewer_depth.py
 /Barcode/trial
 /MonoDepth/data
+

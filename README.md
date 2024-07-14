@@ -47,4 +47,26 @@ VSLAM/Localization | Plane Detection | Fall Detection |
 # Request Camera Feature
 If you want to run the application or object detection on the camera hardware - check this [Link](https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform).
 
+# Supported Platforms and Compute Environments
+
+The following is the check list of supported environments and functionality:
+- Windows
+- Ubuntu
+- Jetson (NVIDIA)
+- Raspeberry PI
+- RealSense AI Engine
+
+# How to Contribute
+
+We greatly appreciate contributions from the community, including examples, applications, and guides. If you'd like to contribute, please follow these guidelines:
+
+1. **Create a pull request (PR)** with the title prefix `[RS]`, adding your new example folder to the `examples/` directory within the repository.
+
+2. **Ensure your project adheres to the following standards:**
+   - Makes use of the `vision` package.
+   - Includes a `README.md` with clear instructions for setting up and running the example.
+   - Avoids adding large files or dependencies unless they are absolutely necessary for the example.
+   - Contributors should be willing to provide support for their examples and address related issues.
+
+
 
