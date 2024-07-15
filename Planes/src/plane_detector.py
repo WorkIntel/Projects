@@ -118,6 +118,7 @@ class PlaneDetector:
 
         self.img3d      = None # contains x,y and depth plains
         self.imgXYZ     = None  # comntains X,Y,Z information after depth image to XYZ transform
+        self.imgMask    = None  # which pixels belongs to which cluster
 
         # params
         self.MIN_SPLIT_SIZE  = 32
@@ -126,6 +127,36 @@ class PlaneDetector:
         # help variable
         self.ang_vec     = np.zeros((3,1))  # help variable
 
+    def add_noise(self, img_gray, noise_percentage = 0.01):
+        "salt and pepper noise"
+        if noise_percentage < 0.001:
+            return img_gray
+
+
+        # Get the image size (number of pixels in the image).
+        img_size = img_gray.size
+
+        # Set the percentage of pixels that should contain noise
+        #noise_percentage = 0.1  # Setting to 10%
+
+        # Determine the size of the noise based on the noise precentage
+        noise_size = int(noise_percentage*img_size)
+
+        # Randomly select indices for adding noise.
+        random_indices = np.random.choice(img_size, noise_size)
+
+        # Create a copy of the original image that serves as a template for the noised image.
+        img_noised = img_gray.copy()
+
+        # Create a noise list with random placements of min and max values of the image pixels.
+        #noise = np.random.choice([img_gray.min(), img_gray.max()], noise_size)
+        noise = np.random.choice([-10, 10], noise_size)
+
+        # Replace the values of the templated noised image at random indices with the noise, to obtain the final noised image.
+        img_noised.flat[random_indices] += noise
+        
+        self.tprint('adding image noise')
+        return img_noised
 
     def init_image(self, img_type = 1):
         # create some images for test
@@ -159,7 +190,15 @@ class PlaneDetector:
         elif img_type == 7: # stair
 
             x,y             = np.meshgrid(np.arange(w),np.arange(h))   
-            self.img        = (np.sign(x - w/2) + np.sign(y - h/2))*5 + 200 # less slope                     
+            self.img        = (np.sign(x - w/2) + np.sign(y - h/2))*5 + 200 # less slope     
+
+
+        elif img_type == 8: # corner
+
+            x,y             = np.meshgrid(np.arange(w),np.arange(h))   
+            self.img        = np.ones((h,w))*250
+            img_bool        = np.logical_and((x - w/2) < 0, (y - h/2) < 0)
+            self.img[img_bool] = 230 # quarter                            
 
         elif img_type == 10: # flat
 
@@ -202,7 +241,10 @@ class PlaneDetector:
             self.img = cv.imread(r"C:\Data\Depth\Plane\image_scl_000.png", cv.IMREAD_GRAYSCALE)  
             self.img = cv.resize(self.img , dsize = self.frame_size)                                     
             
-        #self.img        = np.uint8(self.img)       
+        #self.img        = np.uint8(self.img) 
+
+        self.img = self.add_noise(self.img, 0)
+              
         return self.img
       
     def init_roi(self, test_type = 1):
@@ -241,13 +283,15 @@ class PlaneDetector:
         x3d     = z3d.copy()
         y3d     = z3d.copy()
 
-        ii        = np.logical_and(z3d> 1e-6 , np.isfinite(z3d))
+        #ii        = np.logical_and(z3d> 1e-6 , np.isfinite(z3d))
+        ii        = z3d > 5
         x3d[ii]   = u[ii]*z3d[ii] #/fx
         y3d[ii]   = v[ii]*z3d[ii] #/fy
         z3d[ii]   = z3d[ii]
 
         #self.img3d = np.stack((u/fx,v/fy,z3d), axis = 2)
-        self.img3d = np.stack((u,v,z3d), axis = 2)
+        self.img3d      = np.stack((u,v,z3d), axis = 2)
+        self.imgMask    = np.zeros((h,w))
         return self.img3d
     
     def compute_img3d(self, img = None):
@@ -267,7 +311,9 @@ class PlaneDetector:
         x3d         = self.img3d[:,:,0].copy()  # u/f
         y3d         = self.img3d[:,:,1].copy()  # v/f
 
-        ii          = np.logical_and(z3d > 1e-6 , np.isfinite(z3d))
+        # filter bad z values
+        #ii          = np.logical_and(z3d > 1e-6 , np.isfinite(z3d))
+        ii          = z3d > 15
         x3d[ii]     = x3d[ii]*z3d[ii]
         y3d[ii]     = y3d[ii]*z3d[ii]
         z3d[ii]     = z3d[ii]
@@ -352,6 +398,65 @@ class PlaneDetector:
         roi_params  = {'roi':roi, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }                               
         return roi_params
     
+    def fit_plane_with_outliers(self, roi):
+        "computes normal for the specifric roi and evaluates error. Do it twice to reject outliers"
+        x0,y0,x1,y1 = roi
+
+        # reduce size of the grid for speed
+        roi_area    = (x1-x0)*(y1-y0)
+        step_size   = np.maximum(1,int(np.sqrt(roi_area)/20))
+        #step_size   = 1
+
+        #tck = interpolate.bisplrep(x, y, z, s=0)
+        #znew = interpolate.bisplev(xnew, ynew, tck)
+        roi3d       = self.imgXYZ[y0:y1,x0:x1,:]   
+        if roi3d .shape[0] < 5:
+            self.tprint('Too small region: %d' %step_size)
+            step_size   = 1
+
+        # create matrix of data points
+        x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1))
+        xyz1_matrix = np.hstack((x,y,z)) #,z*0+1))
+
+        # using svd to make the fit to a sub group     
+        tvec        = xyz1_matrix[:,:3].mean(axis=0)#   
+        xyz1        = xyz1_matrix[::step_size,:] - tvec
+        U, S, Vh    = np.linalg.svd(xyz1, full_matrices=True)
+        ii          = np.argmin(S)
+        vnorm       = Vh[ii,:]
+        vnorm       = vnorm*np.sign(vnorm[2]) # keep orientation
+
+        # checking error
+        xyz1        = xyz1_matrix[::1,:] - tvec
+        err         = np.dot(xyz1, vnorm)
+        err_std     = err.std()
+        self.tprint('Fit error iteration 1: %s' %str(err_std))
+
+        # filter only the matching points
+        inlier_ind  = np.abs(err) < 2*err_std
+
+        # perform svd one more time 
+        tvec        = xyz1_matrix[inlier_ind,:3].mean(axis=0)#  
+        xyz1        = xyz1_matrix[inlier_ind,:] - tvec 
+        U, S, Vh    = np.linalg.svd(xyz1, full_matrices=True)
+        ii          = np.argmin(S)
+        vnorm       = Vh[ii,:]
+        vnorm       = vnorm*np.sign(vnorm[2])         # keep orientation
+
+        # checking error
+        err         = np.dot(xyz1, vnorm)
+        err_std     = err.std()
+        self.tprint('Fit error iteration 2: %s' %str(err_std))    
+
+        # We can convert this flat index to row and column indices
+        row_index, col_index = np.unravel_index(inlier_ind, self.imgMask.shape)
+        self.imgMask[row_index, col_index] = 1    
+
+
+        # forming output
+        roi_params  = {'roi':roi, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }                               
+        return roi_params    
+    
     def split_roi_recursively(self, roi, level = 0):
         # splits ROI on 4 regions and recursevly call 
         x0,y0,x1,y1     = roi
@@ -416,7 +521,7 @@ class PlaneDetector:
         levl        = 0.1*tvec[0,2]
         pose_norm  = np.hstack((tvec, rvec.reshape((1,-1)),[[levl]]))
         #self.tprint('roi to pose')
-        return pose_norm.flatten()
+        return pose_norm #.flatten()
 
     def show_image_with_axis(self, img, poses = []):
         "draw results"
@@ -434,7 +539,7 @@ class PlaneDetector:
             avec    = poses[k][3:6] # orientation in degrees
             levl    = poses[k][6]   # level
             #R       = eulerAnglesToRotationMatrix(avec)
-            R       = Rot.from_euler('zyx',avec, degrees = True).as_matrix()
+            R       = Rot.from_euler('xyz',avec, degrees = True).as_matrix()
             rvec, _ = cv.Rodrigues(R)
             tvec    = np.array(poses[k][:3], dtype = np.float32).reshape(rvec.shape) # center of the patch
             img_show= draw_axis(img_show, rvec, tvec, self.cam_matrix, self.cam_distort, len = levl)
@@ -518,9 +623,10 @@ class PlaneDetector:
         
         for roi_p in roi_params_ret:
             pose       = self.convert_roi_params_to_pose(roi_p)
+            pose       = pose.flatten()
             # R          = Rot.from_euler('zyx',pose[3:6],degrees=True).as_matrix()
             # vnorm      = R[:,2]*pose[6]
-            vnorm      = pose[3:6].flatten()*pose[6]
+            vnorm      = pose[3:6]*pose[6]
             #self.tprint(str(vnorm))
             xa, ya, za = [pose[0], pose[0]+vnorm[0]], [pose[1], pose[1]+vnorm[1]], [pose[2], pose[2]+vnorm[2]]
             ax.plot(xa, ya, za, 'r', label='Normal')
@@ -560,7 +666,7 @@ class TestPlaneDetector(unittest.TestCase):
     def test_ImageShow(self):
         p = PlaneDetector()
         p.init_image(1)
-        poses = [[0,0,100,0,0,45,20]]
+        poses = [[0,0,100,0,0,45,10]]
         p.show_image_with_axis(p.img,poses)
         self.assertFalse(p.img is None)
 
@@ -599,14 +705,14 @@ class TestPlaneDetector(unittest.TestCase):
         p.show_points_3d_with_normal(roiXYZ)
         self.assertFalse(imgXYZ is None)  
                      
-    def test_FitPlane(self):
+    def test_fit_plane(self):
         "computes normal to the ROI"
         p       = PlaneDetector()
-        img     = p.init_image(4)
+        img     = p.init_image(5)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(2)
-        roip    = p.fit_plane(imgXYZ, roi)
+        roip    = p.fit_plane(roi)
         pose    = p.convert_roi_params_to_pose(roip)
         p.show_image_with_axis(p.img, pose)
                 
@@ -615,26 +721,26 @@ class TestPlaneDetector(unittest.TestCase):
         p.show_points_3d_with_normal(roiXYZ, pose)
         self.assertFalse(roip['error'] > 0.01)  
 
-    def test_FitPlaneFail(self):
+    def test_fit_plane_fail(self):
         "computes normal to the ROI but the image is bad at this location"
         p       = PlaneDetector()
         img     = p.init_image(10)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(1)
-        roip    = p.fit_plane(imgXYZ, roi)
+        roip    = p.fit_plane(roi)
         pose    = p.convert_roi_params_to_pose(roip)
         p.show_image_with_axis(p.img, pose)
         self.assertTrue(roip['error'] > 0.01)          
 
-    def test_FitPlaneDepthImage(self):
+    def test_fit_plane_depth_image(self):
         "computes normal to the ROI"
         p       = PlaneDetector()
         img     = p.init_image(13)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi     = p.init_roi(2)
-        roip    = p.fit_plane(imgXYZ, roi)
+        roip    = p.fit_plane(roi)
         pose    = p.convert_roi_params_to_pose(roip)
         p.show_image_with_axis(p.img, pose)
                 
@@ -643,11 +749,11 @@ class TestPlaneDetector(unittest.TestCase):
         p.show_points_3d_with_normal(roiXYZ, pose)
         self.assertFalse(roip['error'] > 0.01)  
 
-    def test_RoiSplit(self):
+    def test_split_roi(self):
         "computes ROIS and splits if needed"
         p       = PlaneDetector()
         p.MIN_STD_ERROR = 0.1
-        img     = p.init_image(18)
+        img     = p.init_image(7)
         roi     = p.init_roi(3)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -657,6 +763,22 @@ class TestPlaneDetector(unittest.TestCase):
 
         for roi_s in roi_list:
             self.assertFalse(roi_s['error'] > 0.01)
+
+    def test_fit_plane_with_outliers(self):
+        "computes normal to the ROI"
+        p       = PlaneDetector()
+        img     = p.init_image(1)
+        img3d   = p.init_img3d(img)
+        imgXYZ  = p.compute_img3d(img)
+        roi     = p.init_roi(2)
+        roip    = p.fit_plane_with_outliers(roi)
+        pose    = p.convert_roi_params_to_pose(roip)
+        p.show_image_with_axis(p.img, pose)
+                
+        x0,y0,x1,y1 = roi
+        roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
+        p.show_points_3d_with_normal(roiXYZ, pose)
+        self.assertFalse(roip['error'] > 0.09)              
 
 # ----------------------
 #%% App
@@ -717,11 +839,13 @@ if __name__ == '__main__':
     #suite.addTest(TestPlaneDetector("test_ComputeImg3d")) # ok
     #suite.addTest(TestPlaneDetector("test_ShowImg3d")) # 
     
-    #suite.addTest(TestPlaneDetector("test_FitPlane")) # ok
-    #suite.addTest(TestPlaneDetector("test_FitPlaneFail")) # 
-    #suite.addTest(TestPlaneDetector("test_FitPlaneDepthImage")) #
+    #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_planeFail")) # 
+    #suite.addTest(TestPlaneDetector("test_fit_plane_depth_image")) #
 
-    suite.addTest(TestPlaneDetector("test_RoiSplit")) 
+    #suite.addTest(TestPlaneDetector("test_split_roi")) 
+    suite.addTest(TestPlaneDetector("test_fit_plane_with_outliers")) 
+    
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
