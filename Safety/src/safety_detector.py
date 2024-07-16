@@ -264,10 +264,10 @@ class background_estimator:
 
         if self.mode == 'rgb':
             img_show    = np.uint8(frame_g) #.copy()
-            img_show    = cv.applyColorMap(img_show, cv.COLORMAP_JET)
+            #img_show    = cv.applyColorMap(img_show, cv.COLORMAP_JET)
         elif self.mode == 'ddd':
             img_show    = np.uint8(frame_d)
-            img_show    = cv.applyColorMap(img_show, cv.COLORMAP_JET)
+            #img_show    = cv.applyColorMap(img_show, cv.COLORMAP_JET)
         elif self.mode == 'gdd':
             img_show    = np.stack((frame_g,frame_d,frame_d),axis = 2)
             img_show    = np.uint8(img_show)

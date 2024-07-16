@@ -5,6 +5,7 @@ OpenCV like wrapper for Real Sense Camera
 ==================
 
 Allows to store video and images in different formats and RGB - Depth combinations
+Can extract left and right IR images
 
 
 Usage:
@@ -28,28 +29,28 @@ import numpy as np
 import cv2 as cv
 
 class RealSense(object):
-    def __init__(self,  mode = 'rgb', size=None, **params):
+    def __init__(self,  mode = 'rgb', use_ir = True, **params):
         
         self.frame_size = (1280, 720)
-        self.count = 0
-        # if size is not None:
-        #     w, h = map(int, size.split('x'))
-        #     self.frame_size = (w, h)
-        #     #self.bg = cv.resize(self.bg, self.frame_size)    
-        #     # 
-        self.mode = 'rgb' if mode is None else mode   
+        self.count      = 0
+        self.mode       = 'rgb' if mode is None else mode 
+        self.use_ir     = False if use_ir is None else use_ir
 
         # Configure depth and color streams
         self.pipeline = rs.pipeline()
         self.config   = rs.config()
-        #print(rs.__version__)
-        #self.pipe = rs.pipeline()
-        #self.cfg = rs.config()
+
+        #print('Real Sense version : ', rs.__version__)
+
         self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
-        #self.pipe.start(self.cfg)
+        
+        if self.use_ir:
+            self.config.enable_stream(rs.stream.infrared, 1)
+            self.config.enable_stream(rs.stream.infrared, 2)
+            print('IR is enabled')
 
-        #     # Get device product line for setting a supporting resolution
+        #  Get device product line for setting a supporting resolution
         # pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
         # pipeline_profile = self.config.resolve(pipeline_wrapper)
         # device = pipeline_profile.get_device()
@@ -72,11 +73,11 @@ class RealSense(object):
         # #self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         # #self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
         # Start streaming
-        profile = self.pipeline.start(self.config)
+        profile      = self.pipeline.start(self.config)
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
-        depth_scale = depth_sensor.get_depth_scale()
+        depth_scale  = depth_sensor.get_depth_scale()
         print("Depth Scale is: " , depth_scale)
 
         # Create an align object
@@ -93,36 +94,37 @@ class RealSense(object):
         pass
 
     def change_mode(self, mode = 'rgb'):
-        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','dep']):
-               print(f'Not supported mode = {mode}')
-               #return
+        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','dep','iid','ii2']):
+             print(f'Not supported mode = {mode}')
+               
         self.mode = mode  
         print(f'Current mode {mode}')
 
+
     def read(self, dst=None):
         "with frame alignments and color space transformations"
-        w, h            = self.frame_size
+        w, h                = self.frame_size
 
         # Wait for a coherent pair of frames: depth and color
-        frames          = self.pipeline.wait_for_frames()
+        frames              = self.pipeline.wait_for_frames()
         # Align the depth frame to color frame
-        aligned_frames  = self.align.process(frames)
+        aligned_frames      = self.align.process(frames)
 
         # Get aligned frames
-        depth_frame     = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
-        color_frame     = aligned_frames.get_color_frame()
+        depth_frame         = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
+        color_frame         = aligned_frames.get_color_frame()
         if not depth_frame or not color_frame:
             return False, None
 
         # Convert images to numpy arrays
-        depth_image     = np.asanyarray(depth_frame.get_data())
-        color_image     = np.asanyarray(color_frame.get_data())
+        depth_image         = np.asanyarray(depth_frame.get_data())
+        color_image         = np.asanyarray(color_frame.get_data())
         #color_image = cv.cvtColor(depth_image, cv.COLOR_GRAY2RGB)
         #depth_image = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
 
         # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.03)
-        depth_colormap  = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)
+        depth_scaled        = cv.convertScaleAbs(depth_image, alpha=0.03)
+        depth_colormap      = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)
 
         depth_colormap_dim = depth_colormap.shape
         color_colormap_dim = color_image.shape
@@ -134,7 +136,14 @@ class RealSense(object):
         # else:
         #     images = np.hstack((color_image, depth_colormap))
 
-        # images = color_image
+        if self.use_ir:
+            ir_left     = aligned_frames.get_infrared_frame(1)
+            irl_image   = np.asanyarray(ir_left.get_data())
+            ir_right    = aligned_frames.get_infrared_frame(2)
+            irr_image   = np.asanyarray(ir_right.get_data())
+        else:
+            print('Enable IR use at the start. use_ir = True')    
+            image_out   = color_image            
 
         if self.mode == 'rgb':
             image_out = color_image
@@ -156,7 +165,14 @@ class RealSense(object):
             image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
         elif self.mode == 'sc2':
             depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
-            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)          
+            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
+        elif self.mode == 'ii2':
+            if self.use_ir:
+                image_out   = np.concatenate((irl_image, irr_image), axis = 1)  
+        elif self.mode == 'iid':
+            if self.use_ir:
+                image_out   = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
+
         elif self.mode == 'dep':
             image_out  = depth_image                    
         return True, image_out
@@ -275,7 +291,7 @@ class RealSense(object):
             if ret is False:
                 break
         
-            cv.imshow('frame (c,a,d,1,2,g,s,f,h,r: q - to exit)', frame)
+            cv.imshow('frame (c,a,d,1,2,g,s,f,h,i,o,r: q - to exit)', frame)
             ch = cv.waitKey(10) & 0xff
             if ch == ord('q'):
                 break
@@ -295,8 +311,12 @@ class RealSense(object):
                 self.change_mode('scl')  
             elif ch == ord('2'):
                 self.change_mode('sc2')                                           
+            elif ch == ord('i'):
+                self.change_mode('ii2') 
+            elif ch == ord('o'):
+                self.change_mode('iid') 
             elif ch == ord('h'):
-                self.change_mode('dep') 
+                self.change_mode('dep')                 
             elif ch == ord('s'):
                 self.save_image(frame) 
             elif ch == ord('r'):
