@@ -359,29 +359,36 @@ class PlaneDetector:
         err_std     = err.std()
         return err_std
     
-    def fit_plane(self, roi):
-        "computes normal for the specifric roi and evaluates error"
+    def convert_roi_to_points(self, roi, step_size = 0):
+        "converting roi to pts in XYZ - Nx3 array"
         x0,y0,x1,y1 = roi
 
         # reduce size of the grid for speed
-        roi_area    = (x1-x0)*(y1-y0)
-        step_size   = np.maximum(1,int(np.sqrt(roi_area)/20))
+        if step_size < 1:
+            roi_area    = (x1-x0)*(y1-y0)
+            step_size   = np.maximum(1,int(np.sqrt(roi_area)/10))
 
-        #tck = interpolate.bisplrep(x, y, z, s=0)
-        #znew = interpolate.bisplev(xnew, ynew, tck)
         roi3d       = self.imgXYZ[y0:y1:step_size,x0:x1:step_size,:]   
         if roi3d .shape[0] < 5:
             self.tprint('Too small region: %d' %step_size)
             step_size   = 1
             roi3d       = self.imgXYZ[y0:y1:step_size,x0:x1:step_size,:]   
 
-        x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1))
+        x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1)) 
+        xyz_matrix = np.hstack((x,y,z))   
 
+        return xyz_matrix
+    
+    def fit_plane(self, roi):
+        "computes normal for the specifric roi and evaluates error"
+
+        # roi converted to points with step size on the grid
+        xyz_matrix  = self.convert_roi_to_points(roi, step_size = 0)
+        
         # using svd to make the fit
-        xyz1_matrix = np.hstack((x,y,z)) #,z*0+1))
-        tvec        = xyz1_matrix[:,:3].mean(axis=0)
-        xyz1_matrix = xyz1_matrix - tvec
-        U, S, Vh    = np.linalg.svd(xyz1_matrix, full_matrices=True)
+        tvec        = xyz_matrix[:,:3].mean(axis=0)
+        xyz1_matrix = xyz_matrix - tvec
+        U, S, Vh    = np.linalg.svd(xyz_matrix, full_matrices=True)
         ii          = np.argmin(S)
         vnorm       = Vh[ii,:]
 
@@ -389,45 +396,29 @@ class PlaneDetector:
         vnorm       = vnorm*np.sign(vnorm[2])
 
         # checking error
-        err_std     = self.check_error(xyz1_matrix, vnorm)
+        err_std     = self.check_error(xyz_matrix, vnorm)
         self.tprint('Fit error : %s' %str(err_std))
 
         # forming output
-        #tvec        = xyz1_matrix[:,:3].mean(axis=0)
-        #pose_norm   = np.hstack(tvec, vnorm.reshape((1,-1)))
         roi_params  = {'roi':roi, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }                               
         return roi_params
     
     def fit_plane_with_outliers(self, roi):
         "computes normal for the specifric roi and evaluates error. Do it twice to reject outliers"
-        x0,y0,x1,y1 = roi
 
-        # reduce size of the grid for speed
-        roi_area    = (x1-x0)*(y1-y0)
-        step_size   = np.maximum(1,int(np.sqrt(roi_area)/20))
-        #step_size   = 1
-
-        #tck = interpolate.bisplrep(x, y, z, s=0)
-        #znew = interpolate.bisplev(xnew, ynew, tck)
-        roi3d       = self.imgXYZ[y0:y1,x0:x1,:]   
-        if roi3d .shape[0] < 5:
-            self.tprint('Too small region: %d' %step_size)
-            step_size   = 1
-
-        # create matrix of data points
-        x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1))
-        xyz1_matrix = np.hstack((x,y,z)) #,z*0+1))
+        # roi converted to points with step size on the grid
+        xyz_matrix  = self.convert_roi_to_points(roi, step_size = 0)
 
         # using svd to make the fit to a sub group     
-        tvec        = xyz1_matrix[:,:3].mean(axis=0)#   
-        xyz1        = xyz1_matrix[::step_size,:] - tvec
+        tvec        = xyz_matrix[:,:3].mean(axis=0)#   
+        xyz1        = xyz_matrix[:,:] - tvec
         U, S, Vh    = np.linalg.svd(xyz1, full_matrices=True)
         ii          = np.argmin(S)
         vnorm       = Vh[ii,:]
         vnorm       = vnorm*np.sign(vnorm[2]) # keep orientation
 
         # checking error
-        xyz1        = xyz1_matrix[::1,:] - tvec
+        xyz1        = xyz_matrix[::1,:] - tvec
         err         = np.dot(xyz1, vnorm)
         err_std     = err.std()
         self.tprint('Fit error iteration 1: %s' %str(err_std))
@@ -436,8 +427,8 @@ class PlaneDetector:
         inlier_ind  = np.abs(err) < 2*err_std
 
         # perform svd one more time 
-        tvec        = xyz1_matrix[inlier_ind,:3].mean(axis=0)#  
-        xyz1        = xyz1_matrix[inlier_ind,:] - tvec 
+        tvec        = xyz_matrix[inlier_ind,:3].mean(axis=0)#  
+        xyz1        = xyz_matrix[inlier_ind,:] - tvec 
         U, S, Vh    = np.linalg.svd(xyz1, full_matrices=True)
         ii          = np.argmin(S)
         vnorm       = Vh[ii,:]
@@ -452,10 +443,89 @@ class PlaneDetector:
         row_index, col_index = np.unravel_index(inlier_ind, self.imgMask.shape)
         self.imgMask[row_index, col_index] = 1    
 
-
         # forming output
         roi_params  = {'roi':roi, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }                               
         return roi_params    
+    
+    def fit_plane_ransac(self, roi):
+        
+        """
+        Find the best equation for a plane.
+
+        :param pts: 3D point cloud as a `np.array (N,3)`.
+        :param thresh: Threshold distance from the plane which is considered inlier.
+        :param maxIteration: Number of maximum iteration which RANSAC will loop over.
+        :returns:
+        - `self.equation`:  Parameters of the plane using Ax+By+Cy+D `np.array (1, 4)`
+        - `self.inliers`: points from the dataset considered inliers
+
+        """
+        self.tprint('Fit ransac: ...')  
+        # roi converted to points with step size on the grid
+        pts            = self.convert_roi_to_points(roi, step_size = 0)
+
+        thresh         = 0.05
+        minPoints      = 100
+        maxIteration   = 100
+
+        import random
+        n_points        = pts.shape[0]
+        best_eq         = []
+        best_inliers    = []
+
+        for it in range(maxIteration):
+
+            # Samples 3 random points
+            id_samples = random.sample(range(0, n_points), 3)
+            pt_samples = pts[id_samples]
+
+            # We have to find the plane equation described by those 3 points
+            # We find first 2 vectors that are part of this plane
+            # A = pt2 - pt1
+            # B = pt3 - pt1
+
+            vecA = pt_samples[1, :] - pt_samples[0, :]
+            vecB = pt_samples[2, :] - pt_samples[0, :]
+
+            # Now we compute the cross product of vecA and vecB to get vecC which is normal to the plane
+            vecC = np.cross(vecA, vecB)
+
+            # The plane equation will be vecC[0]*x + vecC[1]*y + vecC[0]*z = -k
+            # We have to use a point to find k
+            vecC = vecC / np.linalg.norm(vecC)
+            k = -np.sum(np.multiply(vecC, pt_samples[1, :]))
+            plane_eq = [vecC[0], vecC[1], vecC[2], k]
+
+            # Distance from a point to a plane
+            # https://mathworld.wolfram.com/Point-PlaneDistance.html
+            pt_id_inliers = []  # list of inliers ids
+            dist_pt = (
+                plane_eq[0] * pts[:, 0] + plane_eq[1] * pts[:, 1] + plane_eq[2] * pts[:, 2] + plane_eq[3]
+            ) / np.sqrt(plane_eq[0] ** 2 + plane_eq[1] ** 2 + plane_eq[2] ** 2)
+
+            # Select indexes where distance is biggers than the threshold
+            pt_id_inliers = np.where(np.abs(dist_pt) <= thresh)[0]
+            if len(pt_id_inliers) > len(best_inliers):
+                best_eq = plane_eq
+                best_inliers = pt_id_inliers
+        
+        self.inliers = best_inliers
+        self.equation = best_eq
+
+        # rtansform to pose output
+        tvec     = pts[best_inliers,:].mean(axis=0)
+        pts_best = pts[best_inliers,:] - tvec
+        vnorm    = np.array(best_eq[:3])
+
+        # checking error
+        err         = np.dot(pts_best, vnorm)
+        err_std     = err.std()
+        self.tprint('Fit error ransac: %s' %str(err_std))  
+
+        # forming output
+        roi_params  = {'roi':best_inliers, 'error': err_std, 'tvec': tvec, 'vnorm':vnorm }          
+
+        return roi_params
     
     def split_roi_recursively(self, roi, level = 0):
         # splits ROI on 4 regions and recursevly call 
@@ -657,20 +727,20 @@ class PlaneDetector:
 # ----------------------
 #%% Tests
 class TestPlaneDetector(unittest.TestCase):
-    def test_Convert(self):
+    def test_convert(self):
         avec = np.random.randint(-180,180, size = (1,3)).flatten().astype(np.float32)
         R    = eulerAnglesToRotationMatrix(avec)
         bvec = rotationMatrixToEulerAngles(R)
         self.assertTrue(np.all(np.abs(avec - bvec) < 1e-6))
 
-    def test_ImageShow(self):
+    def test_image_show(self):
         p = PlaneDetector()
         p.init_image(1)
         poses = [[0,0,100,0,0,45,10]]
         p.show_image_with_axis(p.img,poses)
         self.assertFalse(p.img is None)
 
-    def test_ChessPoseDetect(self):
+    def test_chess_pose_detect(self):
         "understand pose ecomputations"
         p = PlaneDetector()
         p.init_image(11)
@@ -678,14 +748,14 @@ class TestPlaneDetector(unittest.TestCase):
         p.show_image_with_axis(p.img, poses)
         self.assertFalse(p.img is None)     
 
-    def test_InitImg3d(self):
+    def test_init_img3d(self):
         "XYZ point cloud structure init"
         p = PlaneDetector()
         p.init_image(1)
         img3d = p.init_img3d()
         self.assertFalse(img3d is None)    
 
-    def test_ComputeImg3d(self):
+    def test_compute_img3d(self):
         "XYZ point cloud structure init and compute"
         p       = PlaneDetector()
         img     = p.init_image(1)
@@ -693,7 +763,7 @@ class TestPlaneDetector(unittest.TestCase):
         imgXYZ  = p.compute_img3d(img)
         self.assertFalse(imgXYZ is None)     
 
-    def test_ShowImg3d(self):
+    def test_show_img3d(self):
         "XYZ point cloud structure init and compute"
         p       = PlaneDetector()
         img     = p.init_image(1)
@@ -778,7 +848,23 @@ class TestPlaneDetector(unittest.TestCase):
         x0,y0,x1,y1 = roi
         roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
         p.show_points_3d_with_normal(roiXYZ, pose)
-        self.assertFalse(roip['error'] > 0.09)              
+        self.assertFalse(roip['error'] > 0.09)
+
+    def test_fit_plane_ransac(self):
+        "computes with ransac"
+        p       = PlaneDetector()
+        img     = p.init_image(2)
+        img3d   = p.init_img3d(img)
+        imgXYZ  = p.compute_img3d(img)
+        roi     = p.init_roi(2)
+        roip    = p.fit_plane_ransac(roi)
+        pose    = p.convert_roi_params_to_pose(roip)
+        p.show_image_with_axis(p.img, pose)
+                
+        x0,y0,x1,y1 = roi
+        roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
+        p.show_points_3d_with_normal(roiXYZ, pose)
+        self.assertFalse(roip['error'] > 0.09)                        
 
 # ----------------------
 #%% App
@@ -833,19 +919,20 @@ if __name__ == '__main__':
     #unittest.main()
     suite = unittest.TestSuite()
     #suite.addTest(TestPlaneDetector("test_Convert"))
-    #suite.addTest(TestPlaneDetector("test_ImageShow"))
-    #suite.addTest(TestPlaneDetector("test_ChessPoseDetect")) # ok
-    #suite.addTest(TestPlaneDetector("test_InitImg3d")) # ok
-    #suite.addTest(TestPlaneDetector("test_ComputeImg3d")) # ok
-    #suite.addTest(TestPlaneDetector("test_ShowImg3d")) # 
+    #suite.addTest(TestPlaneDetector("test_image_show"))
+    #suite.addTest(TestPlaneDetector("test_chess_pose_detect")) # ok
+    #suite.addTest(TestPlaneDetector("test_init_img3d")) # ok
+    #suite.addTest(TestPlaneDetector("test_compute_img3d")) # ok
+    #suite.addTest(TestPlaneDetector("test_show_img3d")) # 
     
     #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
     #suite.addTest(TestPlaneDetector("test_fit_planeFail")) # 
     #suite.addTest(TestPlaneDetector("test_fit_plane_depth_image")) #
 
     #suite.addTest(TestPlaneDetector("test_split_roi")) 
-    suite.addTest(TestPlaneDetector("test_fit_plane_with_outliers")) 
-    
+    #suite.addTest(TestPlaneDetector("test_fit_plane_with_outliers")) 
+
+    suite.addTest(TestPlaneDetector("test_fit_plane_ransac")) 
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
