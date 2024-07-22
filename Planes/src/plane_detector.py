@@ -22,7 +22,7 @@ import numpy as np
 import cv2 as cv
 import unittest
 from scipy.spatial.transform import Rotation as Rot
-from scipy import interpolate 
+#from scipy import interpolate 
 
  # importing common Use modules 
 import sys 
@@ -244,7 +244,7 @@ class PlaneDetector:
         #self.img        = np.uint8(self.img) 
 
         self.img = self.add_noise(self.img, 0)
-              
+        self.frame_size = self.img.shape[:2]      
         return self.img
       
     def init_roi(self, test_type = 1):
@@ -823,8 +823,8 @@ class TestPlaneDetector(unittest.TestCase):
         "computes ROIS and splits if needed"
         p       = PlaneDetector()
         p.MIN_STD_ERROR = 0.1
-        img     = p.init_image(7)
-        roi     = p.init_roi(3)
+        img     = p.init_image(13)
+        roi     = p.init_roi(4)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
         roi_list= p.split_roi_recursively(roi)
@@ -837,10 +837,10 @@ class TestPlaneDetector(unittest.TestCase):
     def test_fit_plane_with_outliers(self):
         "computes normal to the ROI"
         p       = PlaneDetector()
-        img     = p.init_image(1)
+        img     = p.init_image(13)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(2)
+        roi     = p.init_roi(5)
         roip    = p.fit_plane_with_outliers(roi)
         pose    = p.convert_roi_params_to_pose(roip)
         p.show_image_with_axis(p.img, pose)
@@ -853,10 +853,10 @@ class TestPlaneDetector(unittest.TestCase):
     def test_fit_plane_ransac(self):
         "computes with ransac"
         p       = PlaneDetector()
-        img     = p.init_image(2)
+        img     = p.init_image(13)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(2)
+        roi     = p.init_roi(4)
         roip    = p.fit_plane_ransac(roi)
         pose    = p.convert_roi_params_to_pose(roip)
         p.show_image_with_axis(p.img, pose)
@@ -930,9 +930,9 @@ if __name__ == '__main__':
     #suite.addTest(TestPlaneDetector("test_fit_plane_depth_image")) #
 
     #suite.addTest(TestPlaneDetector("test_split_roi")) 
-    #suite.addTest(TestPlaneDetector("test_fit_plane_with_outliers")) 
+    suite.addTest(TestPlaneDetector("test_fit_plane_with_outliers")) 
 
-    suite.addTest(TestPlaneDetector("test_fit_plane_ransac")) 
+    #suite.addTest(TestPlaneDetector("test_fit_plane_ransac")) 
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
