@@ -1,7 +1,8 @@
 
 '''
+
 Multi planar plain detector using open3d
-==================
+==========================================
 
 Using depth image to compute depth planes locally.
 Based on https://github.com/yuecideng/Multiple_Planes_Detection/tree/master
@@ -11,8 +12,8 @@ Usage:
 
 Environemt : 
 
-    PowerShell: C:\Users\udubin\AppData\Local\Programs\Python\Python310\python.exe -m venv C:\Users\udubin\Documents\Envs\planes
-    Cmd: C:\Users\udubin\Documents\Envs\planes\Scripts\activate.bat
+    PowerShell: C:\\Users\\udubin\\AppData\\Local\\Programs\\Python\\Python310\\python.exe -m venv C:\\Users\\udubin\\Documents\\Envs\\planes
+    Cmd: C:\\Users\\udubin\\Documents\Envs\\planes\\Scripts\\activate.bat
 
 Install : 
 
@@ -27,6 +28,8 @@ Install :
 import numpy as np
 import open3d as o3d
 import unittest
+import random
+import time
 
 from utils import plog, PointGenerator,  RealSense
 
@@ -91,10 +94,8 @@ def PlaneRegression(points, threshold=0.01, init_n=3, iter=1000):
         [ndarray, List]: 4 x 1 plane equation weights, List of plane point index
     """
 
-    pcd = NumpyToPCD(points)
-
-    w, index = pcd.segment_plane(
-        threshold, init_n, iter)
+    pcd         = NumpyToPCD(points)
+    w, index    = pcd.segment_plane(threshold, init_n, iter)
 
     return w, index
 
@@ -137,6 +138,7 @@ class PlaneDetector:
     def __init__(self):
 
         self.point_gen  = PointGenerator()
+        self.points       = None # point cloud
 
         #self.img3d      = None # contains x,y and depth plains
         #self.imgXYZ     = None  # comntains X,Y,Z information after depth image to XYZ transform
@@ -149,8 +151,11 @@ class PlaneDetector:
         # help variable
         #self.ang_vec     = np.zeros((3,1))  # help variable
 
-    def init_points(self):
-        pass
+    def init_points(self, img_type = 1, roi_type = 0):
+        "init point cloud"
+        self.points = self.point_gen.init_point_cloud(img_type,roi_type)
+        self.tprint('Point cloud %d' %img_type)
+        return True
 
     def preprocess_points(self, points):
         "cleaning the point cloud" 
@@ -160,14 +165,14 @@ class PlaneDetector:
         points  = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)       
         return points        
 
-    def fit_planes(self):
+    def fit_planes(self, points):
         "fitting plane usong open3d"
 
         #DrawPointCloud(points, color=(0.4, 0.4, 0.4))
         t0      = time.time()
-        results = DetectMultiPlanes(points, min_ratio=0.05, threshold=0.005, iterations=2000)
+        results = DetectMultiPlanes(points, min_ratio=0.05, threshold=0.1, iterations=2000)
         self.tprint('Time:', time.time() - t0)
-        self.tprint('Planes:',len(results))
+        self.tprint('Planes: %s' %str(len(results)))
 
     def show_planes(self, results):
         "picture the results"
@@ -192,6 +197,18 @@ class PlaneDetector:
         DrawResult(planes, colors)
         self.tprint('Show done')
 
+    def compute_and_show(self):
+        "computes the planes"
+        if self.points is None:
+            self.tprint('Init points first','W')
+            return False
+        
+        points   = self.preprocess_points(self.points)
+        results  = self.fit_planes(points)
+        self.show_planes(results)
+        return True
+        
+
     def tprint(self, txt = '', level = 'I'):
         if level == "I":
             plog.info(txt)
@@ -205,125 +222,23 @@ class PlaneDetector:
 # ----------------------
 #%% Tests
 class TestPlaneDetector(unittest.TestCase):
-
-    def test_image_show(self):
-        p       = PlaneDetector()
-        p.init_image(1)
-        poses = [[0,0,100,0,0,45,10]]
-        p.show_image_with_axis(p.img,poses)
-        self.assertFalse(p.img is None)
-
-    def test_chess_pose_detect(self):
-        "understand pose ecomputations"
-        p = PlaneDetector()
-        p.init_image(11)
-        poses = p.detect_pose_in_chessboard()
-        p.show_image_with_axis(p.img, poses)
-        self.assertFalse(p.img is None)     
- 
-
-    def test_show_img3d(self):
-        "XYZ point cloud structure init and compute"
-        p       = PlaneDetector()
-        img     = p.init_image(1)
-        img3d   = p.init_img3d(img)
-        imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(1)
-        x0,y0,x1,y1 = roi
-        roiXYZ    = imgXYZ[y0:y1,x0:x1,:]
-        p.show_points_3d_with_normal(roiXYZ)
-        self.assertFalse(imgXYZ is None)  
                      
     def test_fit_plane(self):
         "computes normal to the ROI"
         p       = PlaneDetector()
-        img     = p.init_image(5)
-        img3d   = p.init_img3d(img)
-        imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(2)
-        roip    = p.fit_plane(roi)
-        pose    = p.convert_roi_params_to_pose(roip)
-        p.show_image_with_axis(p.img, pose)
-                
-        x0,y0,x1,y1 = roi
-        roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
-        p.show_points_3d_with_normal(roiXYZ, pose)
-        self.assertFalse(roip['error'] > 0.01)  
-
-    def test_fit_plane_fail(self):
-        "computes normal to the ROI but the image is bad at this location"
-        p       = PlaneDetector()
-        img     = p.init_image(10)
-        img3d   = p.init_img3d(img)
-        imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(1)
-        roip    = p.fit_plane(roi)
-        pose    = p.convert_roi_params_to_pose(roip)
-        p.show_image_with_axis(p.img, pose)
-        self.assertTrue(roip['error'] > 0.01)          
-
-
-
-    def test_fit_plane_ransac(self):
-        "computes with ransac"
-        p       = PlaneDetector()
-        img     = p.init_image(13)
-        img3d   = p.init_img3d(img)
-        imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(4)
-        roip    = p.fit_plane_ransac(roi)
-        pose    = p.convert_roi_params_to_pose(roip)
-        p.show_image_with_axis(p.img, pose)
-                
-        x0,y0,x1,y1 = roi
-        roiXYZ       = imgXYZ[y0:y1,x0:x1,:]
-        p.show_points_3d_with_normal(roiXYZ, pose)
-        self.assertFalse(roip['error'] > 0.09)   
+        ret     = p.init_points(1, 4)
+        ret     = p.compute_and_show()
+        self.assertTrue(ret)  
 
 
 #%% Main
 if __name__ == "__main__":
-    import random
-    import time
 
-    p       = PlaneDetector()
-    img     = p.init_image(17)
-    img3d   = p.init_img3d(img)
-    imgXYZ  = p.compute_img3d(img)
-    roi     = p.init_roi(0)
-    points  = p.convert_roi_to_points(roi, step_size = 1)
-    points  = points.astype(np.float64)
 
-    # working
-    #points = ReadPlyPoint('Data/test1.ply')
+    #unittest.main()
+    suite = unittest.TestSuite()
 
-    # pre-processing
-    #points = RemoveNan(points)
-    #points = DownSample(points,voxel_size=0.003)
-    points  = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)
+    suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
 
-    #DrawPointCloud(points, color=(0.4, 0.4, 0.4))
-    t0      = time.time()
-    results = DetectMultiPlanes(points, min_ratio=0.05, threshold=0.005, iterations=2000)
-    print('Time:', time.time() - t0)
-    print('Planes:',len(results))
-    planes = []
-    colors = []
-    for _, plane in results:
-
-        r = random.random()
-        g = random.random()
-        b = random.random()
-
-        color = np.zeros((plane.shape[0], plane.shape[1]))
-        color[:, 0] = r
-        color[:, 1] = g
-        color[:, 2] = b
-
-        planes.append(plane)
-        colors.append(color)
-    
-    planes = np.concatenate(planes, axis=0)
-    colors = np.concatenate(colors, axis=0)
-    DrawResult(planes, colors)
-
+    runner = unittest.TextTestRunner()
+    runner.run(suite)

@@ -266,7 +266,37 @@ class PointGenerator:
         imgXYZ[:,:,2] = z3d
 
         self.imgXYZ = imgXYZ
-        return imgXYZ     
+        return imgXYZ   
+
+    def convert_roi_to_points(self, roi, step_size = 0):
+        "converting roi to pts in XYZ - Nx3 array"
+        x0,y0,x1,y1 = roi
+
+        # reduce size of the grid for speed
+        if step_size < 1:
+            roi_area    = (x1-x0)*(y1-y0)
+            step_size   = np.maximum(1,int(np.sqrt(roi_area)/10))
+
+        roi3d       = self.imgXYZ[y0:y1:step_size,x0:x1:step_size,:]   
+        if roi3d .shape[0] < 5:
+            self.tprint('Too small region: %d' %step_size)
+            step_size   = 1
+            roi3d       = self.imgXYZ[y0:y1:step_size,x0:x1:step_size,:]   
+
+        x,y,z       = roi3d[:,:,0].reshape((-1,1)), roi3d[:,:,1].reshape((-1,1)), roi3d[:,:,2].reshape((-1,1)) 
+        xyz_matrix = np.hstack((x,y,z))   
+
+        return xyz_matrix      
+    
+    def init_point_cloud(self, point_type = 1, roi_type = 1):
+        "init entire point cloud"
+        img     = self.init_image(point_type)
+        img3d   = self.init_img3d(img)
+        imgXYZ  = self.compute_img3d(img)
+        roi     = self.init_roi(roi_type)
+        points  = self.convert_roi_to_points(roi, step_size = 1)
+        points  = points.astype(np.float64)
+        return points
 
     def show_image_with_axis(self, img, poses = []):
         "draw results"
