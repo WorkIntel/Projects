@@ -104,7 +104,8 @@ def DrawResult(points, colors):
     pcd         = o3d.geometry.PointCloud()
     pcd.points  = o3d.utility.Vector3dVector(points)
     pcd.colors  = o3d.utility.Vector3dVector(colors)
-    o3d.visualization.draw_geometries([pcd])
+    vis         = o3d.visualization.draw_geometries([pcd])
+    return vis
 
 
 def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
@@ -152,6 +153,8 @@ class PlaneDetector:
         # help variable
         #self.ang_vec     = np.zeros((3,1))  # help variable
 
+        self.vis              = None # open3d visualizer
+
     def init_points(self, img_type = 1, roi_type = 0):
         "init point cloud"
         self.points = self.point_gen.init_point_cloud(img_type,roi_type)
@@ -182,9 +185,9 @@ class PlaneDetector:
         self.tprint('Planes: %s' %str(len(results)))
 
         return results
-
-    def show_planes(self, results):
-        "picture the results"
+    
+    def convert_results_to_planes(self, results):
+        "convert results to plances andd colors"
         planes = []
         colors = []
         for _, plane in results:
@@ -201,10 +204,33 @@ class PlaneDetector:
             planes.append(plane)
             colors.append(color)
         
-        planes = np.concatenate(planes, axis=0)
-        colors = np.concatenate(colors, axis=0)
-        DrawResult(planes, colors)
+        planes      = np.concatenate(planes, axis=0)
+        colors      = np.concatenate(colors, axis=0)
+        return planes, colors    
+
+    def show_planes(self, results):
+        "convert results to plances andd colors"
+        planes , colors = self.convert_results_to_planes(results)
+        self.vis        = DrawResult(planes, colors)
         self.tprint('Show done')
+
+    def show_real_time(self, results):
+        "show cloud in real time"
+        planes, colors = self.convert_results_to_planes(results)
+        pcd         = o3d.geometry.PointCloud()
+        pcd.points  = o3d.utility.Vector3dVector(planes)
+        pcd.colors  = o3d.utility.Vector3dVector(colors)        
+        if self.vis is None: # create
+            self.vis = o3d.visualization.Visualizer()
+            self.vis.create_window()
+            self.vis.add_geometry(pcd)
+        else:
+            self.vis.update_geometry(pcd)
+            self.vis.poll_events()
+            self.vis.update_renderer()
+
+        return True
+
 
     def compute_and_show(self):
         "computes the planes"
@@ -216,7 +242,25 @@ class PlaneDetector:
         results  = self.fit_planes(points)
         self.show_planes(results)
         return True
+    
+    def compute_and_show_real_time(self):
+        "computes the planes"
+        if self.points is None:
+            self.tprint('Init points first','W')
+            return False
         
+        points   = self.preprocess_points(self.points)
+        results  = self.fit_planes(points)
+        ret      = self.show_real_time(results)
+        self.tprint('Show single')
+        return ret    
+        
+    def close(self):
+        "finish"
+        if self.vis is not None:
+            self.vis.destroy_window()
+        
+        self.tprint('Finished')
 
     def tprint(self, txt = '', level = 'I'):
         if level == "I":
@@ -256,7 +300,30 @@ class TestPlaneDetector(unittest.TestCase):
             img     = imgc[:,:,2]
             ret     = p.init_from_image(img)
             ret     = p.compute_and_show()
-        self.assertTrue(ret)                  
+        
+        p.close()
+        c.close()        
+        self.assertTrue(ret)    
+
+    def test_fit_plane_real_time(self):
+        "images from the sensor"
+        c           = RealSense(mode = 'rgd')
+        p           = PlaneDetector()
+        stop        = False
+        while not stop:
+            ret, imgc   = c.read()
+            if not ret:
+                break
+            # ret     = c.show_image(imgc)
+            # if ret:
+            #     break
+            img     = imgc[:,:,2]
+            ret     = p.init_from_image(img)
+            ret     = p.compute_and_show_real_time()
+
+        p.close()
+        c.close()
+        self.assertTrue(ret)                        
 
 # ----------------------
 #%% App - show planes on depth image live
@@ -297,6 +364,7 @@ class App:
                 self.tracker.clear()
             if ch == 27:
                 break
+
 # ----------------------
 #%% Main
 if __name__ == "__main__":
@@ -308,7 +376,8 @@ if __name__ == "__main__":
     #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
     #suite.addTest(TestPlaneDetector("test_fit_plane_image")) # ok
     
-    suite.addTest(TestPlaneDetector("test_fit_plane_single_shot")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_plane_single_shot")) # ok
+    suite.addTest(TestPlaneDetector("test_fit_plane_real_time")) # nok - not working good
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
