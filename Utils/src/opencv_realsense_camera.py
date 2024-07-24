@@ -4,8 +4,10 @@ OpenCV like wrapper for Real Sense Camera
 
 ==================
 
-Allows to store video and images in different formats and RGB - Depth combinations
-Can extract left and right IR images
+Allows to read, display store video and images of RGB - Depth combinations in different formats.  
+Can extract left and right IR images.
+Aligns RGB and Depth data.
+
 
 
 Usage:
@@ -16,7 +18,7 @@ Usage:
     Press 'r' to start recording and one more time 'r' to stop video recording
                                         
 
-Environemt : 
+Environment : 
     C:\\Users\\udubin\\Documents\\Envs\\barcode
 
 Install : 
@@ -172,7 +174,6 @@ class RealSense(object):
         elif self.mode == 'iid':
             if self.use_ir:
                 image_out   = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
-
         elif self.mode == 'dep':
             image_out  = depth_image                    
         return True, image_out
@@ -274,6 +275,44 @@ class RealSense(object):
             self.vout = None
             print('Video file created')
 
+    def show_image(self, frame):
+        "show image on opencv window"
+        do_exit = False
+        cv.imshow('frame (c,a,d,1,2,g,s,f,h,i,o,r: q - to exit)', frame)
+        ch = cv.waitKey(1) & 0xff
+        if ch == ord('q'):
+            do_exit = True 
+        elif ch == ord('c'): # regular RGB image
+            self.change_mode('rgb')
+        elif ch == ord('d'): # depth image
+            self.change_mode('ddd')            
+        elif ch == ord('g'): # concatenated g and d
+            self.change_mode('gd') 
+        elif ch == ord('b'):
+            self.change_mode('rgd') 
+        elif ch == ord('f'):
+            self.change_mode('ggd') 
+        elif ch == ord('a'):
+            self.change_mode('gdd')     
+        elif ch == ord('1'):
+            self.change_mode('scl')  
+        elif ch == ord('2'):
+            self.change_mode('sc2')                                           
+        elif ch == ord('i'):
+            self.change_mode('ii2') 
+        elif ch == ord('o'):
+            self.change_mode('iid') 
+        elif ch == ord('h'):
+            self.change_mode('dep')                 
+        elif ch == ord('s'):
+            self.save_image(frame) 
+        elif ch == ord('r'):
+            self.record_on = not self.record_on
+            print('Video record %s' %str(self.record_on))
+
+        return do_exit
+          
+
     def close(self):
         # stop record
         self.record_release()
@@ -291,38 +330,10 @@ class RealSense(object):
             if ret is False:
                 break
         
-            cv.imshow('frame (c,a,d,1,2,g,s,f,h,i,o,r: q - to exit)', frame)
-            ch = cv.waitKey(10) & 0xff
-            if ch == ord('q'):
-                break
-            elif ch == ord('c'): # regular RGB image
-                self.change_mode('rgb')
-            elif ch == ord('d'): # depth image
-                self.change_mode('ddd')            
-            elif ch == ord('g'): # concatenated g and d
-                self.change_mode('gd') 
-            elif ch == ord('b'):
-                self.change_mode('rgd') 
-            elif ch == ord('f'):
-                self.change_mode('ggd') 
-            elif ch == ord('a'):
-                self.change_mode('gdd')     
-            elif ch == ord('1'):
-                self.change_mode('scl')  
-            elif ch == ord('2'):
-                self.change_mode('sc2')                                           
-            elif ch == ord('i'):
-                self.change_mode('ii2') 
-            elif ch == ord('o'):
-                self.change_mode('iid') 
-            elif ch == ord('h'):
-                self.change_mode('dep')                 
-            elif ch == ord('s'):
-                self.save_image(frame) 
-            elif ch == ord('r'):
-                self.record_on = not self.record_on
-                print('Video record %s' %str(self.record_on))
-                
+            ret     = self.show_image(frame)
+            if ret :
+                break  
+
             # check if record is required
             self.record_video(frame)   
 

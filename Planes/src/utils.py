@@ -182,7 +182,11 @@ class PointGenerator:
 
         elif img_type == 21:
             self.img = cv.imread(r"C:\Data\Depth\Plane\image_scl_000.png", cv.IMREAD_GRAYSCALE)  
-            self.img = cv.resize(self.img , dsize = self.frame_size)                                     
+            self.img = cv.resize(self.img , dsize = self.frame_size)       
+
+        elif img_type == 31:
+            self.img = cv.imread(r"C:\Users\udubin\Documents\Projects\Planes\data\image_ggd_053.png", cv.IMREAD_GRAYSCALE)  
+            self.img = cv.resize(self.img , dsize = self.frame_size)                                           
             
         #self.img        = np.uint8(self.img) 
 
@@ -234,6 +238,7 @@ class PointGenerator:
         #self.img3d = np.stack((u/fx,v/fy,z3d), axis = 2)
         self.img3d      = np.stack((u,v,z3d), axis = 2)
         self.imgMask    = np.zeros((h,w))
+        self.frame_size = img.shape[:2]
         return self.img3d
     
     def compute_img3d(self, img = None):
@@ -297,6 +302,15 @@ class PointGenerator:
         points  = self.convert_roi_to_points(roi, step_size = 1)
         points  = points.astype(np.float64)
         return points
+    
+    def init_point_cloud_from_image(self, img, roi_type = 0):
+        "init entire point cloud from depth image"
+        img3d   = self.init_img3d(img)
+        imgXYZ  = self.compute_img3d(img)
+        roi     = self.init_roi(roi_type)
+        points  = self.convert_roi_to_points(roi, step_size = 1)
+        points  = points.astype(np.float64)
+        return points    
 
     def show_image_with_axis(self, img, poses = []):
         "draw results"

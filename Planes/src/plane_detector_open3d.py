@@ -30,6 +30,7 @@ import open3d as o3d
 import unittest
 import random
 import time
+import cv2 as cv
 
 from utils import plog, PointGenerator,  RealSense
 
@@ -156,6 +157,12 @@ class PlaneDetector:
         self.points = self.point_gen.init_point_cloud(img_type,roi_type)
         self.tprint('Point cloud %d' %img_type)
         return True
+    
+    def init_from_image(self, img):
+        "init point cloud from image"
+        self.points = self.point_gen.init_point_cloud_from_image(img)
+        self.tprint('Point cloud init from image')
+        return True
 
     def preprocess_points(self, points):
         "cleaning the point cloud" 
@@ -232,14 +239,65 @@ class TestPlaneDetector(unittest.TestCase):
         ret     = p.compute_and_show()
         self.assertTrue(ret)  
 
-    def test_fit_plane_depth(self):
+    def test_fit_plane_image(self):
         "images"
         p       = PlaneDetector()
-        ret     = p.init_points(15, 4)
+        ret     = p.init_points(17, 4) # 17, 18
         ret     = p.compute_and_show()
-        self.assertTrue(ret)          
+        self.assertTrue(ret) 
 
+    def test_fit_plane_single_shot(self):
+        "images from the sensor"
+        c           = RealSense(mode = 'rgd')
+        p           = PlaneDetector()
+        ret, imgc   = c.read()
+        if ret:
+            ret     = c.show_image(imgc)
+            img     = imgc[:,:,2]
+            ret     = p.init_from_image(img)
+            ret     = p.compute_and_show()
+        self.assertTrue(ret)                  
 
+# ----------------------
+#%% App - show planes on depth image live
+class App:
+    def __init__(self, src):
+        self.cap        = RealSense()
+        self.cap.change_mode('dep')
+
+        self.frame      = None
+        self.paused     = False
+        self.tracker    = PlaneDetector()
+
+        cv.namedWindow('Plane')
+
+    def run(self):
+        while True:
+            playing = not self.paused
+            if playing or self.frame is None:
+                ret, frame = self.cap.read()
+                if not ret:
+                    break
+                self.frame = frame.copy()
+
+            vis = self.frame.copy()
+            if playing:
+                tracked = self.tracker.track(self.frame)
+                for tr in tracked:
+                    cv.polylines(vis, [np.int32(tr.quad)], True, (255, 255, 255), 2)
+                    for (x, y) in np.int32(tr.p1):
+                        cv.circle(vis, (x, y), 2, (255, 255, 255))
+
+            self.rect_sel.draw(vis)
+            cv.imshow('Plane', vis)
+            ch = cv.waitKey(1)
+            if ch == ord(' '):
+                self.paused = not self.paused
+            if ch == ord('c'):
+                self.tracker.clear()
+            if ch == 27:
+                break
+# ----------------------
 #%% Main
 if __name__ == "__main__":
 
@@ -248,7 +306,9 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
 
     #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
-    suite.addTest(TestPlaneDetector("test_fit_plane_depth")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_plane_image")) # ok
+    
+    suite.addTest(TestPlaneDetector("test_fit_plane_single_shot")) # ok
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
