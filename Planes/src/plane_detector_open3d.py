@@ -129,7 +129,7 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
         plane_list.append((w, target[index]))
         target = np.delete(target, index, axis=0)
 
-    print('Found %d planes' %count)
+    print('Found %d planes' %len(plane_list))
     return plane_list
 
 
@@ -146,7 +146,7 @@ class PlaneDetector:
 
         # params
         self.MIN_SPLIT_SIZE  = 32
-        self.MIN_STD_ERROR   = 0.01
+        self.MIN_STD_ERROR   = 0.9
 
         # help variable
         #self.ang_vec     = np.zeros((3,1))  # help variable
@@ -170,9 +170,11 @@ class PlaneDetector:
 
         #DrawPointCloud(points, color=(0.4, 0.4, 0.4))
         t0      = time.time()
-        results = DetectMultiPlanes(points, min_ratio=0.05, threshold=0.1, iterations=2000)
-        self.tprint('Time:', time.time() - t0)
+        results = DetectMultiPlanes(points, min_ratio=0.05, threshold = self.MIN_STD_ERROR, iterations=2000)
+        self.tprint('Time:   %s' %str(time.time() - t0))
         self.tprint('Planes: %s' %str(len(results)))
+
+        return results
 
     def show_planes(self, results):
         "picture the results"
@@ -224,11 +226,18 @@ class PlaneDetector:
 class TestPlaneDetector(unittest.TestCase):
                      
     def test_fit_plane(self):
-        "computes normal to the ROI"
+        "synthetic"
         p       = PlaneDetector()
-        ret     = p.init_points(1, 4)
+        ret     = p.init_points(5, 0) # 2,8,4 - ok
         ret     = p.compute_and_show()
         self.assertTrue(ret)  
+
+    def test_fit_plane_depth(self):
+        "images"
+        p       = PlaneDetector()
+        ret     = p.init_points(15, 4)
+        ret     = p.compute_and_show()
+        self.assertTrue(ret)          
 
 
 #%% Main
@@ -238,7 +247,8 @@ if __name__ == "__main__":
     #unittest.main()
     suite = unittest.TestSuite()
 
-    suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
+    suite.addTest(TestPlaneDetector("test_fit_plane_depth")) # ok
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
