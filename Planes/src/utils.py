@@ -229,11 +229,16 @@ class PointGenerator:
         x3d     = z3d.copy()
         y3d     = z3d.copy()
 
-        #ii        = np.logical_and(z3d> 1e-6 , np.isfinite(z3d))
-        ii        = z3d > 5
-        x3d[ii]   = u[ii]*z3d[ii] #/fx
-        y3d[ii]   = v[ii]*z3d[ii] #/fy
-        z3d[ii]   = z3d[ii]
+
+        # filter bad z values
+        ii          = z3d > 5
+        x3d[ii]     = x3d[ii]*z3d[ii]
+        y3d[ii]     = y3d[ii]*z3d[ii]
+        z3d[ii]     = z3d[ii]
+
+        # z3d[z3d < 5] = 5
+        # x3d          = x3d*z3d
+        # y3d          = y3d*z3d
 
         #self.img3d = np.stack((u/fx,v/fy,z3d), axis = 2)
         self.img3d      = np.stack((u,v,z3d), axis = 2)
@@ -260,10 +265,15 @@ class PointGenerator:
 
         # filter bad z values
         #ii          = np.logical_and(z3d > 1e-6 , np.isfinite(z3d))
-        ii          = z3d > 15
+        ii          = z3d > 5
         x3d[ii]     = x3d[ii]*z3d[ii]
         y3d[ii]     = y3d[ii]*z3d[ii]
         z3d[ii]     = z3d[ii]
+
+        # z3d[z3d < 5] = 5
+        # x3d          = x3d*z3d
+        # y3d          = y3d*z3d
+     
 
         # x,y,z coordinates in 3D
         imgXYZ[:,:,0] = x3d

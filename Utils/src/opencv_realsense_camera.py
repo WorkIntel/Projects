@@ -31,7 +31,7 @@ import numpy as np
 import cv2 as cv
 
 class RealSense(object):
-    def __init__(self,  mode = 'rgb', use_ir = True, **params):
+    def __init__(self,  mode = 'rgb', use_ir = False, **params):
         
         self.frame_size = (1280, 720)
         self.count      = 0
@@ -51,6 +51,8 @@ class RealSense(object):
             self.config.enable_stream(rs.stream.infrared, 1)
             self.config.enable_stream(rs.stream.infrared, 2)
             print('IR is enabled')
+        else:
+            print('IR is disabled')
 
         #  Get device product line for setting a supporting resolution
         # pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)

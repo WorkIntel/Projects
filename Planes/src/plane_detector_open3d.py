@@ -129,6 +129,7 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
         w, index = PlaneRegression(target, threshold=threshold, init_n=3, iter=iterations)
         count += len(index)
         plane_list.append((w, target[index]))
+        #plane_list.append((w, index))
         target = np.delete(target, index, axis=0)
 
     print('Found %d planes' %len(plane_list))
@@ -148,10 +149,10 @@ class PlaneDetector:
 
         # params
         self.MIN_SPLIT_SIZE  = 32
-        self.MIN_STD_ERROR   = 0.9
+        self.MIN_STD_ERROR   = 1
 
         # help variable
-        #self.ang_vec     = np.zeros((3,1))  # help variable
+        self.plane_colors   = [[0.2,0.1,0.8],[0.9,0.5,0.3],[0.2,0.9,0.3],[0.6,0.7,0.1],[0.2,0.8,0.9]]  # plane colors
 
         self.vis              = None # open3d visualizer
 
@@ -181,20 +182,28 @@ class PlaneDetector:
         #DrawPointCloud(points, color=(0.4, 0.4, 0.4))
         t0      = time.time()
         results = DetectMultiPlanes(points, min_ratio=0.05, threshold = self.MIN_STD_ERROR, iterations=2000)
-        self.tprint('Time:   %s' %str(time.time() - t0))
-        self.tprint('Planes: %s' %str(len(results)))
+        self.tprint('Time:   %s, Planes : %s' %(str(time.time() - t0),str(len(results))))
+        #self.tprint('Planes: %s' %str(len(results)))
 
         return results
     
     def convert_results_to_planes(self, results):
         "convert results to plances andd colors"
+        points = self.points
         planes = []
         colors = []
+        col_num= len(self.plane_colors)
+        cnt    = 0
+        #for _, index in results:
         for _, plane in results:
 
-            r = random.random()
-            g = random.random()
-            b = random.random()
+            # plane = points[index]
+            r,g,b = self.plane_colors[cnt]
+            cnt   = (cnt + 1) % col_num
+
+            # r = random.random()
+            # g = random.random()
+            # b = random.random()
 
             color = np.zeros((plane.shape[0], plane.shape[1]))
             color[:, 0] = r
@@ -208,13 +217,13 @@ class PlaneDetector:
         colors      = np.concatenate(colors, axis=0)
         return planes, colors    
 
-    def show_planes(self, results):
+    def show_3d_planes(self, results):
         "convert results to plances andd colors"
         planes , colors = self.convert_results_to_planes(results)
         self.vis        = DrawResult(planes, colors)
         self.tprint('Show done')
 
-    def show_real_time(self, results):
+    def show_3d_real_time(self, results):
         "show cloud in real time"
         planes, colors = self.convert_results_to_planes(results)
         pcd         = o3d.geometry.PointCloud()
@@ -240,10 +249,10 @@ class PlaneDetector:
         
         points   = self.preprocess_points(self.points)
         results  = self.fit_planes(points)
-        self.show_planes(results)
+        self.show_3d_planes(results)
         return True
     
-    def compute_and_show_real_time(self):
+    def compute_and_show_3d_real_time(self):
         "computes the planes"
         if self.points is None:
             self.tprint('Init points first','W')
@@ -251,7 +260,7 @@ class PlaneDetector:
         
         points   = self.preprocess_points(self.points)
         results  = self.fit_planes(points)
-        ret      = self.show_real_time(results)
+        ret      = self.show_3d_real_time(results)
         self.tprint('Show single')
         return ret    
         
@@ -279,7 +288,7 @@ class TestPlaneDetector(unittest.TestCase):
     def test_fit_plane(self):
         "synthetic"
         p       = PlaneDetector()
-        ret     = p.init_points(5, 0) # 2,8,4 - ok
+        ret     = p.init_points(2, 4) # 2,8,4 - ok
         ret     = p.compute_and_show()
         self.assertTrue(ret)  
 
@@ -319,7 +328,7 @@ class TestPlaneDetector(unittest.TestCase):
             #     break
             img     = imgc[:,:,2]
             ret     = p.init_from_image(img)
-            ret     = p.compute_and_show_real_time()
+            ret     = p.compute_and_show_3d_real_time()
 
         p.close()
         c.close()
@@ -376,8 +385,8 @@ if __name__ == "__main__":
     #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
     #suite.addTest(TestPlaneDetector("test_fit_plane_image")) # ok
     
-    #suite.addTest(TestPlaneDetector("test_fit_plane_single_shot")) # ok
-    suite.addTest(TestPlaneDetector("test_fit_plane_real_time")) # nok - not working good
+    suite.addTest(TestPlaneDetector("test_fit_plane_single_shot")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_plane_real_time")) # nok - not working good
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
