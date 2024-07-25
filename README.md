@@ -22,7 +22,7 @@ Planes | Edges | Corners |
 
 -  General Object Detection - well defined objects detected by using Depth data. 
 
-Motion Detection/Safety | Object Detection in 2D | 2D Objects using YOLO |
+Object/Camera Motion Detection | Object Detection in 2D | 2D Objects using YOLO |
 :------------: |  :----------: | :-------------:  |
 [![Safety](https://github.com/WorkIntel/Projects/blob/main/Safety/doc/motion_detection-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Safety/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Yolo](https://github.com/WorkIntel/Projects/blob/main/Yolo/doc/object_counting_output-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Yolo)  |
 
