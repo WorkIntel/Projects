@@ -172,11 +172,12 @@ class PlaneDetector:
         #points = DownSample(points,voxel_size=0.003)
         #points  = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)      
         # 
-        # pcd     = NumpyToPCD(points)
-        # cl, ind = pcd.remove_statistical_outlier(nb_neighbors = 50, std_ratio = 0.5)
-        # points  = PCDToNumpy(cl) 
-        # self.valid_index = ind
+        pcd             = NumpyToPCD(points)
+        cl, ind         = pcd.remove_statistical_outlier(nb_neighbors = 50, std_ratio = 0.5)
+        points_valid    = PCDToNumpy(cl) 
 
+        # important : we use valid index to filter the points - otherwise cannot project to the image
+        self.valid_index = ind
         return points    
 
     def detect_multiple_planes(self, points, min_ratio=0.05, threshold=0.01, iterations=1000):
@@ -195,22 +196,32 @@ class PlaneDetector:
         N           = len(points)
         target      = points.copy()
         count       = 0
-        valid_bool  = np.zeros((N,1))
+        
         if self.valid_index is not None:
-            valid_bool[self.valid_index] = 1
+            valid_bool                    = np.zeros((N,1),dtype='bool')
+            valid_bool[self.valid_index]  = True
+        else:
+            valid_bool                    = np.ones((N,1),dtype='bool')
+
+        valid_bool  = valid_bool.flatten()
+        N           = valid_bool.sum()  # the number of valid points could differ from the total points
 
         while count < (1 - min_ratio) * N:
 
-            valid_index = np.argwhere(~np.isnan(target[:,0]))
+            #valid_index = np.argwhere(~np.isnan(target[:,0]))
+            valid_index = np.argwhere(valid_bool)
             target_temp = target[valid_index].squeeze()
+
             w, index    = PlaneRegression(target_temp, threshold=threshold, init_n=3, iter=iterations)
             count      += len(index)
             image_index = valid_index[index]
             plane_list.append((w, target[image_index].squeeze(), image_index))
+
             #plane_list.append((w, index))
             #target      = np.delete(target, index, axis=0)
             # do not delete - since index coutation is bad
-            target[image_index,0] = np.nan
+            #target[image_index,0] = np.nan
+            valid_bool[image_index] = False
 
         self.tprint('Found %d planes' %len(plane_list))
         return plane_list        
