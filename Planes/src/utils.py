@@ -196,7 +196,7 @@ class PointGenerator:
       
     def init_roi(self, test_type = 1):
         "load the test case"
-        roi = [0,0,self.frame_size[0],self.frame_size[1]]
+        roi = [0,0,self.frame_size[1],self.frame_size[0]]
         if test_type == 1:
             roi = [310,230,330,250] # xlu, ylu, xrb, yrb
         elif test_type == 2:

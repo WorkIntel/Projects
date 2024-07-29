@@ -76,9 +76,8 @@ def RemoveNoiseStatistical(pc, nb_neighbors=20, std_ratio=2.0):
         [ndarray]: N x 3 point clouds
     """
 
-    pcd = NumpyToPCD(pc)
-    cl, ind = pcd.remove_statistical_outlier(
-        nb_neighbors=nb_neighbors, std_ratio=std_ratio)
+    pcd     = NumpyToPCD(pc)
+    cl, ind = pcd.remove_statistical_outlier(nb_neighbors=nb_neighbors, std_ratio=std_ratio)
 
     return PCDToNumpy(cl)
 
@@ -120,17 +119,17 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
         [List[tuple(np.ndarray, List)]]: Plane equation and plane point index
     """
 
-    plane_list = []
-    N = len(points)
-    target = points.copy()
-    count = 0
+    plane_list  = []
+    N           = len(points)
+    target      = points.copy()
+    count       = 0
 
     while count < (1 - min_ratio) * N:
-        w, index = PlaneRegression(target, threshold=threshold, init_n=3, iter=iterations)
-        count += len(index)
+        w, index    = PlaneRegression(target, threshold=threshold, init_n=3, iter=iterations)
+        count      += len(index)
         plane_list.append((w, target[index]))
         #plane_list.append((w, index))
-        target = np.delete(target, index, axis=0)
+        target      = np.delete(target, index, axis=0)
 
     print('Found %d planes' %len(plane_list))
     return plane_list
@@ -140,19 +139,17 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
 class PlaneDetector:
     def __init__(self):
 
-        self.point_gen  = PointGenerator()
-        self.points       = None # point cloud
+        self.point_gen      = PointGenerator()
+        self.points         = None # point cloud
+        self.valid_index    = None # if downsampled or filtered
 
-        #self.img3d      = None # contains x,y and depth plains
-        #self.imgXYZ     = None  # comntains X,Y,Z information after depth image to XYZ transform
-        #self.imgMask    = None  # which pixels belongs to which cluster
 
         # params
         self.MIN_SPLIT_SIZE  = 32
-        self.MIN_STD_ERROR   = 1
+        self.MIN_STD_ERROR   = 1 
 
         # help variable
-        self.plane_colors   = [[0.2,0.1,0.8],[0.9,0.5,0.3],[0.2,0.9,0.3],[0.6,0.7,0.1],[0.2,0.8,0.9]]  # plane colors
+        self.plane_colors   = [[0.2,0.1,0.8],[0.9,0.5,0.3],[0.2,0.9,0.3],[0.6,0.7,0.1],[0.2,0.8,0.9],[0.9,0.1,0.9],[0.4,0.4,0.4],[0.9,0.9,0.9]]  # plane colors
 
         self.vis              = None # open3d visualizer
 
@@ -173,21 +170,66 @@ class PlaneDetector:
         # pre-processing
         #points = RemoveNan(points)
         #points = DownSample(points,voxel_size=0.003)
-        points  = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)       
-        return points        
+        #points  = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)      
+        # 
+        # pcd     = NumpyToPCD(points)
+        # cl, ind = pcd.remove_statistical_outlier(nb_neighbors = 50, std_ratio = 0.5)
+        # points  = PCDToNumpy(cl) 
+        # self.valid_index = ind
 
-    def fit_planes(self, points):
+        return points    
+
+    def detect_multiple_planes(self, points, min_ratio=0.05, threshold=0.01, iterations=1000):
+        """ Detect multiple planes from given point clouds
+
+        Args:
+            points (np.ndarray): 
+            min_ratio (float, optional): The minimum left points ratio to end the Detection. Defaults to 0.05.
+            threshold (float, optional): RANSAC threshold in (m). Defaults to 0.01.
+
+        Returns:
+            [List[tuple(np.ndarray, List)]]: Plane equation and plane point index
+        """
+
+        plane_list  = []
+        N           = len(points)
+        target      = points.copy()
+        count       = 0
+        valid_bool  = np.zeros((N,1))
+        if self.valid_index is not None:
+            valid_bool[self.valid_index] = 1
+
+        while count < (1 - min_ratio) * N:
+
+            valid_index = np.argwhere(~np.isnan(target[:,0]))
+            target_temp = target[valid_index].squeeze()
+            w, index    = PlaneRegression(target_temp, threshold=threshold, init_n=3, iter=iterations)
+            count      += len(index)
+            image_index = valid_index[index]
+            plane_list.append((w, target[image_index].squeeze(), image_index))
+            #plane_list.append((w, index))
+            #target      = np.delete(target, index, axis=0)
+            # do not delete - since index coutation is bad
+            target[image_index,0] = np.nan
+
+        self.tprint('Found %d planes' %len(plane_list))
+        return plane_list        
+
+    def fit_planes(self, points, use_index = False):
         "fitting plane usong open3d"
-
         #DrawPointCloud(points, color=(0.4, 0.4, 0.4))
         t0      = time.time()
-        results = DetectMultiPlanes(points, min_ratio=0.05, threshold = self.MIN_STD_ERROR, iterations=2000)
+        #if not use_index:
+        #    results = DetectMultiPlanes(points, min_ratio=0.05, threshold = self.MIN_STD_ERROR, iterations=2000)
+        #else:
+        
+        results = self.detect_multiple_planes(points, min_ratio=0.05, threshold = self.MIN_STD_ERROR, iterations=2000)
         self.tprint('Time:   %s, Planes : %s' %(str(time.time() - t0),str(len(results))))
         #self.tprint('Planes: %s' %str(len(results)))
 
         return results
     
-    def convert_results_to_planes(self, results):
+    def convert_results_to_3d_planes(self, results):
         "convert results to plances andd colors"
         points = self.points
         planes = []
@@ -195,17 +237,13 @@ class PlaneDetector:
         col_num= len(self.plane_colors)
         cnt    = 0
         #for _, index in results:
-        for _, plane in results:
+        for _, plane, index in results:
 
-            # plane = points[index]
-            r,g,b = self.plane_colors[cnt]
-            cnt   = (cnt + 1) % col_num
+            #plane = points[index]
+            r,g,b       = self.plane_colors[cnt]
+            cnt         = (cnt + 1) % col_num
 
-            # r = random.random()
-            # g = random.random()
-            # b = random.random()
-
-            color = np.zeros((plane.shape[0], plane.shape[1]))
+            color       = np.zeros((plane.shape[0], plane.shape[1]))
             color[:, 0] = r
             color[:, 1] = g
             color[:, 2] = b
@@ -219,13 +257,14 @@ class PlaneDetector:
 
     def show_3d_planes(self, results):
         "convert results to plances andd colors"
-        planes , colors = self.convert_results_to_planes(results)
+        planes , colors = self.convert_results_to_3d_planes(results)
         self.vis        = DrawResult(planes, colors)
         self.tprint('Show done')
+        return True
 
     def show_3d_real_time(self, results):
         "show cloud in real time"
-        planes, colors = self.convert_results_to_planes(results)
+        planes, colors = self.convert_results_to_3d_planes(results)
         pcd         = o3d.geometry.PointCloud()
         pcd.points  = o3d.utility.Vector3dVector(planes)
         pcd.colors  = o3d.utility.Vector3dVector(colors)        
@@ -237,19 +276,8 @@ class PlaneDetector:
             self.vis.update_geometry(pcd)
             self.vis.poll_events()
             self.vis.update_renderer()
+            self.tprint('Update 3D')
 
-        return True
-
-
-    def compute_and_show(self):
-        "computes the planes"
-        if self.points is None:
-            self.tprint('Init points first','W')
-            return False
-        
-        points   = self.preprocess_points(self.points)
-        results  = self.fit_planes(points)
-        self.show_3d_planes(results)
         return True
     
     def compute_and_show_3d_real_time(self):
@@ -262,7 +290,81 @@ class PlaneDetector:
         results  = self.fit_planes(points)
         ret      = self.show_3d_real_time(results)
         self.tprint('Show single')
-        return ret    
+        return ret 
+
+    def compute_and_show(self):
+        "computes the planes"
+        if self.points is None:
+            self.tprint('Init points first','W')
+            return False
+        
+        points   = self.preprocess_points(self.points)
+        results  = self.fit_planes(points, use_index = True)
+        ret      = self.show_3d_planes(results)
+        return ret  
+
+    def show_image_with_planes(self, img, results):
+        "draw results by projecting planes on image"
+
+        #planes , colors = self.convert_results_to_3d_planes(results)
+        plane_number = len(results)
+        if plane_number < 1:
+            self.tprint('No planes found')
+            
+        # deal with black and white
+        img_show = np.uint8(img) #.copy()
+        if len(img.shape) < 3:
+            img_show = np.stack((img_show,) * 3, axis=-1) #cv.applyColorMap(img_show, cv.COLORMAP_JET)
+
+        img_planes  = np.zeros_like(img_show)
+        col_num     = len(self.plane_colors)
+        cnt         = 0
+        for _, plane, index_flat in results:
+        #for _, plane in results:
+
+            # plane = points[index]
+            r,g,b   = self.plane_colors[cnt]
+            cnt     = (cnt + 1) % col_num
+
+            # convert
+            yi, xi  = np.unravel_index(index_flat, img.shape)
+            # assign
+            img_planes[yi,xi,0] = np.uint8(r*255) 
+            img_planes[yi,xi,1] = np.uint8(g*255) 
+            img_planes[yi,xi,2] = np.uint8(b*255)
+
+            # Blend the images
+            
+
+            # img_tmp = img_show[:,:,1]
+            # img_tmp[index_flat] = np.uint8(g*255) 
+            # img_show[:,:,1] = img_tmp
+
+        img_show = cv.addWeighted(img_show, 0.5, img_planes, 0.5, 0.0)
+
+        cv.imshow('Image & Planes', img_show)
+        self.tprint('show done')
+        ch = cv.waitKey(5)      
+
+        return True  
+    
+    def show_2d_planes(self, results):
+        "convert results to plances andd colors"
+        planes , colors = self.convert_results_to_3d_planes(results)
+        self.vis        = DrawResult(planes, colors)
+        self.tprint('Show done')
+
+    def compute_and_show_2d_real_time(self):
+        "computes the planes"
+        if self.points is None:
+            self.tprint('Init points first','W')
+            return False
+        
+        points   = self.preprocess_points(self.points)
+        results  = self.fit_planes(points)
+        ret      = self.show_3d_real_time(results)
+        self.tprint('Show single')
+        return ret      
         
     def close(self):
         "finish"
@@ -299,7 +401,7 @@ class TestPlaneDetector(unittest.TestCase):
         ret     = p.compute_and_show()
         self.assertTrue(ret) 
 
-    def test_fit_plane_single_shot(self):
+    def test_fit_plane_3d_single_shot(self):
         "images from the sensor"
         c           = RealSense(mode = 'rgd')
         p           = PlaneDetector()
@@ -314,7 +416,7 @@ class TestPlaneDetector(unittest.TestCase):
         c.close()        
         self.assertTrue(ret)    
 
-    def test_fit_plane_real_time(self):
+    def test_fit_plane_3d_real_time(self):
         "images from the sensor"
         c           = RealSense(mode = 'rgd')
         p           = PlaneDetector()
@@ -332,7 +434,56 @@ class TestPlaneDetector(unittest.TestCase):
 
         p.close()
         c.close()
-        self.assertTrue(ret)                        
+        self.assertTrue(ret)     
+
+    def test_fit_plane_2d(self):
+        "synthetic"
+        p       = PlaneDetector()
+        ret     = p.init_points(8, 0) # 2 - ok
+        points  = p.preprocess_points(p.points)
+        results = p.fit_planes(points)
+        imgc    = p.point_gen.imgXYZ
+        ret     = p.show_image_with_planes(imgc[:,:,0], results)
+        self.assertTrue(ret)           
+
+    def test_fit_plane_2d_single_shot(self):
+        "images from the sensor - project on imshow"
+        c           = RealSense(mode = 'rgd')
+        p           = PlaneDetector()
+        ret, imgc   = c.read()
+        if ret:
+            ret     = c.show_image(imgc)
+            img     = imgc[:,:,2]
+            ret     = p.init_from_image(img)
+            points  = p.preprocess_points(p.points)
+            results = p.fit_planes(points)
+            ret     = p.show_image_with_planes(imgc[:,:,0], results)
+        
+        p.close()
+        c.close()        
+        self.assertTrue(ret)     
+
+    def test_fit_plane_2d_real_time(self):
+        "images from the sensor"
+        c           = RealSense(mode = 'rgd')
+        p           = PlaneDetector()
+        stop        = False
+        while not stop:
+            ret, imgc   = c.read()
+            if not ret:
+                break
+            # ret     = c.show_image(imgc)
+            # if ret:
+            #     break
+            img     = imgc[:,:,2]
+            ret     = p.init_from_image(img)
+            points  = p.preprocess_points(p.points)
+            results = p.fit_planes(points)
+            ret     = p.show_image_with_planes(imgc[:,:,0], results)
+
+        p.close()
+        c.close()
+        self.assertTrue(ret)                                     
 
 # ----------------------
 #%% App - show planes on depth image live
@@ -385,8 +536,14 @@ if __name__ == "__main__":
     #suite.addTest(TestPlaneDetector("test_fit_plane")) # ok
     #suite.addTest(TestPlaneDetector("test_fit_plane_image")) # ok
     
-    suite.addTest(TestPlaneDetector("test_fit_plane_single_shot")) # ok
-    #suite.addTest(TestPlaneDetector("test_fit_plane_real_time")) # nok - not working good
+    #suite.addTest(TestPlaneDetector("test_fit_plane_3d_single_shot")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_plane_3d_real_time")) # nok - not working good
+
+    #suite.addTest(TestPlaneDetector("test_fit_plane_2d")) # ok
+    #suite.addTest(TestPlaneDetector("test_fit_plane_2d_single_shot")) # ok
+    suite.addTest(TestPlaneDetector("test_fit_plane_2d_real_time"))
+    
+
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
