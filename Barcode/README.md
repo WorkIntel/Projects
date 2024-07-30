@@ -27,9 +27,11 @@ We are using pyzbar and opencv contributed to detect barcodes and aruco markers.
 1. Install python 3.10 from Python Release Python 3.10.0 | Python.org
 
 2. Create virtual environment. In Windows PowerShell:
-Python -m venv <your path>\Envs\barcode
+
+python -m venv <your path>\Envs\barcode
 
 3. Activate virtual environment. In Windows CMD shell:
+
 <your path>\Envs\barcode\Scripts\activate.bat
 
 4. Installing realsense driver. For example, download pyrealsense2-2.55.10.6089-cp310-cp310-win_amd64.whl:
@@ -37,15 +39,19 @@ Python -m venv <your path>\Envs\barcode
 pip install pyrealsense2-2.55.10.6089-cp310-cp310-win_amd64.whl
 
 5. Install opencv and numpy:
+
 pip install opencv-contrib-python
 
 6. Instrall PyZbar library:
+
 pip install pyzbar
 
 7. Install scipy:
+
 python -m pip install scipy
 
 8. Install matplotlib:
+
 pip install matplotlib
 
 # Usage
