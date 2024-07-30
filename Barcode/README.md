@@ -58,9 +58,9 @@ pip install matplotlib
 
 ## Troublshooting
 
-1. During PyZbar installation if the following rrror happens: 
+# During PyZbar installation if the following error happens: 
 
 FileNotFoundError: Could not find module '<your path>\Envs\barcode\lib\site-packages\pyzbar\libzbar-64.dll' (or one of its dependencies). Try using the full path with constructor syntax.
 
-install vcredist_x64.exe From <https://www.microsoft.com/en-gb/download/details.aspx?id=40784> 
+Fix: Install vcredist_x64.exe From <https://www.microsoft.com/en-gb/download/details.aspx?id=40784> 
 Download Visual C++ Redistributable Packages for Visual Studio 2013 from Official Microsoft Download Center
