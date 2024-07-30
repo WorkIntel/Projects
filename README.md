@@ -43,7 +43,7 @@ Region Detection | Object Counting | Object Tracking |
 
 VSLAM/Localization | Plane Detection | Fall Detection |
 :------------: |  :----------: | :-------------:  |
-[![Camera Control](https://user-images.githubusercontent.com/32394882/230602616-6b57c351-09c4-4aba-bdec-842afcc3b2ea.gif)](https://www.stereolabs.com/docs/video/camera-controls/) | [![Plane Detection](doc/Corner-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/tree/main/Planes#readme/)  | [![Multi Camera Fusion](https://user-images.githubusercontent.com/32394882/228791106-a5f971d8-8d6f-483b-9f87-7f0f0025b8be.gif)](/fusion) |
+[![Camera Control](https://user-images.githubusercontent.com/32394882/230602616-6b57c351-09c4-4aba-bdec-842afcc3b2ea.gif)](https://www.stereolabs.com/docs/video/camera-controls/) | [![Plane Detection](Planes/doc/ezgif.com-animated-gif-maker.gif)](https://github.com/WorkIntel/Projects/tree/main/Planes#readme/)  | [![Multi Camera Fusion](https://user-images.githubusercontent.com/32394882/228791106-a5f971d8-8d6f-483b-9f87-7f0f0025b8be.gif)](/fusion) |
 
 # Request Camera Feature
 If you want to run the application or object detection on the camera hardware - check this [link](https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform).
