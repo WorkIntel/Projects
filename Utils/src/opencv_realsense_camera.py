@@ -31,7 +31,7 @@ import numpy as np
 import cv2 as cv
 
 class RealSense(object):
-    def __init__(self,  mode = 'rgb', use_ir = False, **params):
+    def __init__(self,  mode = 'rgb', use_ir = True, **params):
         
         self.frame_size = (1280, 720)
         self.count      = 0

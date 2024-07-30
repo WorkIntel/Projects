@@ -351,7 +351,7 @@ class PlaneDetector:
             # img_tmp[index_flat] = np.uint8(g*255) 
             # img_show[:,:,1] = img_tmp
 
-        img_show = cv.addWeighted(img_show, 0.5, img_planes, 0.5, 0.0)
+        img_show = cv.addWeighted(img_show, 0.7, img_planes, 0.3, 0.0)
 
         cv.imshow('Image & Planes', img_show)
         self.tprint('show done')
