@@ -61,7 +61,7 @@ or
 
 ```
 
-# Troublshooting
+# Troubleshooting
 
 ## During PyZbar installation if the following error happens: 
 
