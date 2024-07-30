@@ -24,7 +24,7 @@ We are using pyzbar and opencv contributed to detect barcodes and aruco markers.
 
 # Installation Windows
 
-1. Install python 3.10 from Python Release Python 3.10.0 | Python.org
+1. Install python 3.10 from Python Release Python 3.10.0 | <https://www.python.org>
 
 2. Create virtual environment. In Windows PowerShell:
 
