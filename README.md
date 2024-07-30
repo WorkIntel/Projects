@@ -12,7 +12,7 @@ The list of the supported objects, frameworks, platforms and applications are be
 
 Barcodes   | QR Codes | Aruco Markers |
 :------------: |  :----------: | :-------------:  |
-[![Barcode](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  | [![Aruco](Barcode/doc/aruco_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  |
+[![Barcode](Barcode/doc/barcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  | [![QR Codes](https://github.com/WorkIntel/Projects/blob/main/Barcode/doc/qrcode_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  | [![Aruco](Barcode/doc/aruco_camera-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Barcode/README.md)  |
 
 -  Planes, Edges, Corners - 3D depth objects detected by using Depth data. 
 
