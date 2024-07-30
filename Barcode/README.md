@@ -17,12 +17,12 @@ The following objects are supported:
 These objects could be integrated in your robotics and video processing pipe line.
 
 
-# Modules
+# Modules and License
 
-We are using pyzbar and opencv contributed 
+We are using pyzbar and opencv contributed to detect barcodes and aruco markers.
 
 
-## Installation Windows
+# Installation Windows
 
 1. Install python 3.10 from Python Release Python 3.10.0 | Python.org
 
@@ -30,7 +30,7 @@ We are using pyzbar and opencv contributed
 Python -m venv <your path>\Envs\barcode
 
 3. Activate virtual environment. In Windows CMD shell:
-C:\Users\udubin\Documents\Envs\barcode\Scripts\activate.bat
+<your path>\Envs\barcode\Scripts\activate.bat
 
 4. Installing realsense driver. For example, download pyrealsense2-2.55.10.6089-cp310-cp310-win_amd64.whl:
 pip install pyrealsense2-2.55.10.6089-cp310-cp310-win_amd64.whl
@@ -47,18 +47,23 @@ python -m pip install scipy
 8. Install matplotlib:
 pip install matplotlib
 
-## Usage
+# Usage
 
 ```py
->>> from skspatial.objects import Vector
+>>> from barcode_realsense_detector import test_camera_realsense
+>>> test_camera_realsense()  # run the example
 
->>> vector = Vector([2, 0, 0])
+```
+or
+```py
+>>> from aruco_realsense_detector import test_camera
+>>> test_camera()  # run the example
 
 ```
 
-## Troublshooting
+# Troublshooting
 
-### During PyZbar installation if the following error happens: 
+## During PyZbar installation if the following error happens: 
 
 FileNotFoundError: Could not find module '<your path>\Envs\barcode\lib\site-packages\pyzbar\libzbar-64.dll' (or one of its dependencies). Try using the full path with constructor syntax.
 
