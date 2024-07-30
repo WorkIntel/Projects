@@ -18,7 +18,7 @@ Barcodes   | QR Codes | Aruco Markers |
 
 Planes | Edges | Corners |
 :------------: |  :----------: | :-------------:  |
-[![Depth Sensing](https://user-images.githubusercontent.com/32394882/230639409-356b8dfa-df66-4bc2-84d8-a25fd0229779.gif)](https://www.stereolabs.com/docs/depth-sensing)  | [![Edges](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://github.com/WorkIntel/Projects/blob/main/Planes/README.md)  | [![Corners](https://github.com/WorkIntel/Projects/blob/main/Planes/doc/Corner-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Planes/README.md)  |
+[![Planes](Planes/doc/ezgif.com-animated-gif-maker.gif)](https://github.com/WorkIntel/Projects/blob/main/Planes/README.md)  | [![Edges](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://github.com/WorkIntel/Projects/blob/main/Planes/README.md)  | [![Corners](https://github.com/WorkIntel/Projects/blob/main/Planes/doc/Corner-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Planes/README.md)  |
 
 -  General Object Detection - well defined objects detected by using Depth data. 
 
