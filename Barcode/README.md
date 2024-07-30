@@ -33,6 +33,7 @@ Python -m venv <your path>\Envs\barcode
 <your path>\Envs\barcode\Scripts\activate.bat
 
 4. Installing realsense driver. For example, download pyrealsense2-2.55.10.6089-cp310-cp310-win_amd64.whl:
+
 pip install pyrealsense2-2.55.10.6089-cp310-cp310-win_amd64.whl
 
 5. Install opencv and numpy:
