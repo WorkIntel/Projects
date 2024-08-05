@@ -33,7 +33,7 @@ import cv2 as cv
 class RealSense(object):
     def __init__(self,  mode = 'rgb', use_ir = True, **params):
         
-        self.frame_size = (1280, 720)
+        self.frame_size = (640,480) #(1280, 720)
         self.count      = 0
         self.mode       = 'rgb' if mode is None else mode 
         self.use_ir     = False if use_ir is None else use_ir
@@ -44,8 +44,8 @@ class RealSense(object):
 
         #print('Real Sense version : ', rs.__version__)
 
-        self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
-        self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+        self.config.enable_stream(rs.stream.depth, self.frame_size[0], self.frame_size[1], rs.format.z16, 30)
+        self.config.enable_stream(rs.stream.color, self.frame_size[0], self.frame_size[1], rs.format.bgr8, 30)
         
         if self.use_ir:
             self.config.enable_stream(rs.stream.infrared, 1)
@@ -83,6 +83,9 @@ class RealSense(object):
         depth_sensor = profile.get_device().first_depth_sensor()
         depth_scale  = depth_sensor.get_depth_scale()
         print("Depth Scale is: " , depth_scale)
+
+        # turn emitter on-off
+        depth_sensor.set_option(rs.option.emitter_enabled, 0)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
