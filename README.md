@@ -22,11 +22,11 @@ Planes | Edges | Corners |
 
 -  General Object Detection - well defined objects detected by using Depth data. 
 
-Object/Camera Motion Detection | Object Detection in 2D | 2D Objects using YOLO |
+Object Motion Detection | Object Detection in 2D | 2D Objects using YOLO |
 :------------: |  :----------: | :-------------:  |
-[![Safety](https://github.com/WorkIntel/Projects/blob/main/Safety/doc/motion_detection-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Safety/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Yolo](https://github.com/WorkIntel/Projects/blob/main/Yolo/doc/object_counting_output-ezgif.com-video-to-gif-converter.gif)](https://github.com/WorkIntel/Projects/blob/main/Yolo)  |
+[![Safety](Safety/doc/motion_detection-ezgif.com-video-to-gif-converter.gif)](Safety/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Yolo](Yolo/doc/object_counting_output-ezgif.com-video-to-gif-converter.gif)](Yolo/README.md)  |
 
--  3D Pose estimation from RGB and depth data. 
+-  3D Pose estimation from RGB and Depth data. 
 
 3D Pose Cup | Object Detection in 2D | 3D Pose Parts |
 :------------: |  :----------: | :-------------:  |
@@ -37,13 +37,13 @@ Object/Camera Motion Detection | Object Detection in 2D | 2D Objects using YOLO 
 
 User level applications supported by the Camera software
 
-Region Detection | Object Counting | Object Tracking |
+Region Detection | Object Counting | Motion Detection |
 :------------: |  :----------: | :-------------:  |
-[![Positional Tracking](https://user-images.githubusercontent.com/32394882/229093429-a445e8ae-7109-4995-bc1d-6a27a61bdb60.gif)](https://www.stereolabs.com/docs/positional-tracking/) | [![Global Localization](https://user-images.githubusercontent.com/32394882/230602944-ed61e6dd-e485-4911-8a4c-d6c9e4fab0fd.gif)](/global%20localization) | [![Spatial Mapping](https://user-images.githubusercontent.com/32394882/229099549-63ca7832-b7a2-42eb-9971-c1635d205b0c.gif)](https://www.stereolabs.com/docs/spatial-mapping) |
+[![Positional Tracking](https://user-images.githubusercontent.com/32394882/229093429-a445e8ae-7109-4995-bc1d-6a27a61bdb60.gif)](https://www.stereolabs.com/docs/positional-tracking/) | [![Global Localization](https://user-images.githubusercontent.com/32394882/230602944-ed61e6dd-e485-4911-8a4c-d6c9e4fab0fd.gif)](/global%20localization) | [![Motion](Safety/doc/motion_detection-ezgif.com-video-to-gif-converter.gif)](Safety/README.md) |
 
 VSLAM/Localization | Plane Detection | Body Detection |
 :------------: |  :----------: | :-------------:  |
-[![Camera Control](https://user-images.githubusercontent.com/32394882/230602616-6b57c351-09c4-4aba-bdec-842afcc3b2ea.gif)](https://www.stereolabs.com/docs/video/camera-controls/) | [![Floor Detection](Planes/doc/ezgif.com-animated-gif-maker.gif)](https://github.com/WorkIntel/Projects/tree/main/Planes#readme/)  | [![Multi Camera Fusion](https://user-images.githubusercontent.com/32394882/228791106-a5f971d8-8d6f-483b-9f87-7f0f0025b8be.gif)](/fusion) |
+[![Camera Control](https://user-images.githubusercontent.com/32394882/230602616-6b57c351-09c4-4aba-bdec-842afcc3b2ea.gif)](https://www.stereolabs.com/docs/video/camera-controls/) | [![Floor Detection](Planes/doc/ezgif.com-animated-gif-maker.gif)](Planes/README.md)  | [![Multi Camera Fusion](https://user-images.githubusercontent.com/32394882/228791106-a5f971d8-8d6f-483b-9f87-7f0f0025b8be.gif)](/fusion) |
 
 # Request Camera Feature
 If you want to run the application or object detection on the camera hardware - check this [link](https://docs.google.com/forms/d/e/1FAIpQLSdduDbnrRExDGFQqWAn8pX7jSr8KnwBmwuFOR9dgUabEp0F1A/viewform).
