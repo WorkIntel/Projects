@@ -42,7 +42,7 @@ class RealSense(object):
         self.pipeline = rs.pipeline()
         self.config   = rs.config()
 
-        #print('Real Sense version : ', rs.__version__)
+       
 
         self.config.enable_stream(rs.stream.depth, self.frame_size[0], self.frame_size[1], rs.format.z16, 30)
         self.config.enable_stream(rs.stream.color, self.frame_size[0], self.frame_size[1], rs.format.bgr8, 30)
@@ -55,10 +55,12 @@ class RealSense(object):
             print('IR is disabled')
 
         #  Get device product line for setting a supporting resolution
-        # pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
-        # pipeline_profile = self.config.resolve(pipeline_wrapper)
-        # device = pipeline_profile.get_device()
-        # device_product_line = str(device.get_info(rs.camera_info.product_line))
+        pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+        pipeline_profile = self.config.resolve(pipeline_wrapper)
+        device = pipeline_profile.get_device()
+        device_product_line = str(device.get_info(rs.camera_info.product_line))
+        print('Device product line : ', device_product_line)
+        #print('Real Sense version : ', rs.__version__)
 
         #found_rgb = False
         # for s in device.sensors:
@@ -70,22 +72,21 @@ class RealSense(object):
         #     exit(0)       
 
 
-   
-
         # self.config.enable_stream(rs.stream.depth, self.frame_size[0], self.frame_size[1], rs.format.z16, 30)
         # self.config.enable_stream(rs.stream.color, self.frame_size[0], self.frame_size[1], rs.format.bgr8, 30)
         # #self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         # #self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
         # Start streaming
-        profile      = self.pipeline.start(self.config)
+        profile         = self.pipeline.start(self.config)
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
-        depth_sensor = profile.get_device().first_depth_sensor()
-        depth_scale  = depth_sensor.get_depth_scale()
+        depth_sensor    = profile.get_device().first_depth_sensor()
+        depth_scale     = depth_sensor.get_depth_scale()
         print("Depth Scale is: " , depth_scale)
 
         # turn emitter on-off
-        depth_sensor.set_option(rs.option.emitter_enabled, 0)
+        if device_product_line != 'D400':
+            depth_sensor.set_option(rs.option.emitter_enabled, 0)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -101,7 +102,7 @@ class RealSense(object):
         pass
 
     def change_mode(self, mode = 'rgb'):
-        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','dep','iid','ii2']):
+        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2']):
              print(f'Not supported mode = {mode}')
                
         self.mode = mode  

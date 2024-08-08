@@ -28,9 +28,9 @@ Object Motion Detection | Object Detection in 2D | 2D Objects using YOLO |
 
 -  3D Pose estimation from RGB and Depth data. 
 
-3D Pose Cup | Object Detection in 2D | 3D Pose Parts |
+3D Pose Cup | 3D Pose Box | 3D Pose Metal Parts |
 :------------: |  :----------: | :-------------:  |
-[![Pose6D](Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  | [![Object Detection](https://user-images.githubusercontent.com/32394882/230630901-9d53502a-f3f9-45b6-bf57-027148bb18ad.gif)](https://www.stereolabs.com/docs/object-detection)  | [![Pose6D-P](Pose6D/doc/object_0007_out-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  |
+[![Pose6D](Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  | [![Pose6D-M](Pose6D/doc/RecordingMatch2024-08-08102001-ezgif.com-video-to-gif-converter)](Pose6D/README.md)  | [![Pose6D-P](Pose6D/doc/object_0007_out-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  |
 
 
 # Applications
