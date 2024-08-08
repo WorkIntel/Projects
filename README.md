@@ -30,7 +30,7 @@ Object Motion Detection | Object Detection in 2D | 2D Objects using YOLO |
 
 3D Pose Cup | 3D Pose Box | 3D Pose Metal Parts |
 :------------: |  :----------: | :-------------:  |
-[![Pose6D](Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  | [![Pose6D-M](Pose6D/doc/RecordingMatch2024-08-08102001-ezgif.com-video-to-gif-converter)](Pose6D/README.md)  | [![Pose6D-P](Pose6D/doc/object_0007_out-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  |
+[![Pose6D](Pose6D/doc/pose6d-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  | [![Pose6D-M](Pose6D/doc/RecordingMatch2024-08-08102001-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  | [![Pose6D-P](Pose6D/doc/object_0007_out-ezgif.com-video-to-gif-converter.gif)](Pose6D/README.md)  |
 
 
 # Applications
