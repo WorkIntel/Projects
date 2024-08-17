@@ -9,8 +9,11 @@
 *.json
 *.avi
 *.txt
-Barcode/Tests/_opencv_viewer_depth.py
+*.m
+*.tif
+*.mat
 /Barcode/trial
 /MonoDepth/data
 /Motion/trial
+/Pose6D/trial
 
