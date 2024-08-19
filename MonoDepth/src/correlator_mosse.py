@@ -156,7 +156,7 @@ class MOSSE:
         z           = resp[my-5:my+5, mx-5:mx+5]
         xp, yp      = peak_fit_2d(z)
         print(f"{my},{mx}: {yp:.2f},{xp:.2f}")
-        time.sleep(0.5)
+        #time.sleep(0.5)
 
         # # UD  subpixel
         # respc       = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_COMPLEX_OUTPUT)

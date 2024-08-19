@@ -37,6 +37,7 @@
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 def peak_fit_2d(Z):
     """
@@ -88,6 +89,21 @@ def create_zdata(dx = 0.125, dy = 0.125):
     #z        = w - (np.abs(x - w/2)**4 + np.abs(y - h/2)**4) 
     return z
 
+def show_3d(z):
+    "show 3d data"
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    w, h     = z.shape
+    x,y      = np.meshgrid(np.arange(w),np.arange(h))      
+    ax.scatter(x, y, z, marker='.')
+
+    ax.set_xlabel('X [mm]')
+    ax.set_ylabel('Y [mm]')
+    ax.set_zlabel('Z [mm]')
+    #ax.set_aspect('equal', 'box')
+    plt.show() #block=False)        
+
 
 if __name__ == '__main__':
     
@@ -97,4 +113,6 @@ if __name__ == '__main__':
         z        = create_zdata(xs, ys)
         xp, yp   = peak_fit_2d(z)
         print(xs, ys, xp, yp)
+
+        show_3d(z)
    

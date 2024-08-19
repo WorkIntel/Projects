@@ -81,8 +81,8 @@ def brenner_focus_measure(image):
     DH = np.zeros((M, N))
     DV = np.zeros((M, N))
 
-    DV[1:M-2, :] = image[2:, :] - image[:-2, :]
-    DH[:, 1:N-2] = image[:, 2:] - image[:, :-2]
+    DV[1:M-1, :] = image[2:, :] - image[:-2, :]
+    DH[:, 1:N-1] = image[:, 2:] - image[:, :-2]
 
     FM = np.maximum(DH, DV)
     FM = FM**2
@@ -158,6 +158,100 @@ def helm_focus_measure(image, wsize):
 
     return fm
 
+def grat_focus_measure(image, wsize):
+    """
+    Computes the thresholded gradient focus measure.
+
+    Args:
+        image: The input image as a numpy array.
+        wsize: The size of the neighborhood for focus measure calculation.
+
+    Returns:
+        The computed focus measure as a numpy array.
+    """
+
+    Ix = image.copy()
+    Iy = image.copy()
+    Iy[:-1, :] = np.diff(image, axis=0)
+    Ix[:, :-1] = np.diff(image, axis=1)
+    FM = np.maximum(np.abs(Ix), np.abs(Iy))
+
+    if wsize == 0:
+        fm = np.mean(FM)
+    else:
+        fm = generic_filter(FM, np.mean, size=(wsize, wsize))
+
+    return fm
+
+def lape_focus_measure(image, wsize):
+    """
+    Computes the energy of the Laplacian focus measure.
+
+    Args:
+        image: The input image as a numpy array.
+        wsize: The size of the neighborhood for focus measure calculation.
+
+    Returns:
+        The computed focus measure as a numpy array.
+    """
+
+    laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    FM = convolve(image, laplacian, mode='reflect')**2
+
+    if wsize == 0:
+        fm = np.mean(FM)
+    else:
+        fm = generic_filter(FM, np.mean, size=(wsize, wsize))
+
+    return fm
+
+def lapm_focus_measure(image, wsize):
+    """
+    Computes the modified Laplacian focus measure.
+
+    Args:
+        image: The input image as a numpy array.
+        wsize: The size of the neighborhood for focus measure calculation.
+
+    Returns:
+        The computed focus measure as a numpy array.
+    """
+
+    M = np.array([-1, 2, -1])
+    Lx = convolve(image, M, mode='reflect')
+    Ly = convolve(image, M[np.newaxis, :], mode='reflect')
+    FM = np.abs(Lx) + np.abs(Ly)
+
+    if wsize == 0:
+        fm = np.mean(FM)
+    else:
+        fm = generic_filter(FM, np.mean, size=(wsize, wsize))
+
+    return fm
+
+def tengthird_focus_measure(image, wsize):
+    """
+    Computes the Tenengrad focus measure.
+
+    Args:
+        image: The input image as a numpy array.
+        wsize: The size of the neighborhood for focus measure calculation.
+
+    Returns:
+        The computed focus measure as a numpy array.
+    """
+
+    Sx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    Gx = convolve(image, Sx, mode='reflect')
+    Gy = convolve(image, Sx.T, mode='reflect')
+    FM = Gx**2 + Gy**2
+
+    if wsize == 0:
+        fm = np.mean(FM)
+    else:
+        fm = generic_filter(FM, np.mean, size=(wsize, wsize))
+
+    return fm
 
 def focus_measure(image, measure, wsize):
     if wsize == 0 or wsize is None:
@@ -174,32 +268,50 @@ def focus_measure(image, measure, wsize):
     
     # Add other cases for different focus measures
     if measure.upper() == 'CONT':
-        fm = contrast_focus_measure(image)  
+        fm = contrast_focus_measure(image, wsize)  
     
-    if measure.upper() == 'BREN': # Brenner's (Santos97)
+    elif measure.upper() == 'BREN': # Brenner's (Santos97)
         fm = brenner_focus_measure(image)
 
-    if measure.upper() == 'CURV': # Image Curvature (Helmli2001)
+    elif measure.upper() == 'CURV': # Image Curvature (Helmli2001)
         fm = curvature_focus_measure(image,wsize)
     
-    if measure.upper() == 'DCTM': # % DCT Modified (Lee2008)
+    elif measure.upper() == 'DCTM': # % DCT Modified (Lee2008)
         fm = dctm_focus_measure(image, wsize)
 
-    if measure.upper() == 'GDER': # Gaussian derivative (Geusebroek2000)
+    elif measure.upper() == 'GDER': # Gaussian derivative (Geusebroek2000)
         fm = gder_focus_measure(image, wsize)
 
-    if measure.upper() == 'HELM' : #%Helmli's mean method (Helmli2001)
+    elif measure.upper() == 'HELM' : #%Helmli's mean method (Helmli2001)
         fm = helm_focus_measure(image, wsize)
+
+    elif measure.upper() == 'GRAT' : # Thresholded gradient (Snatos97)
+        fm = grat_focus_measure(image, 0)
+
+    elif measure.upper() == 'LAPE' : # Energy of laplacian (Subbarao92a)
+        fm = lape_focus_measure(image, wsize)        
+
+    elif measure.upper() == 'LAPM' : # Modified Laplacian (Nayar89)
+        fm = lapm_focus_measure(image, wsize)  
+
+    elif measure.upper() == 'TENG' : # Tenengrad (Krotkov86)
+        fm = tengthird_focus_measure(image, wsize)  
+        
 
     else:
         raise ValueError(f'Unknown measure {measure}')
     
     return fm
 
-# Example usage:
-# Load an image using OpenCV
-image = cv2.imread('path_to_image', cv2.IMREAD_GRAYSCALE)
-image = image.astype(np.float64)  # Convert to double
 
-# Call the focus measure function
-fm = focus_measure(image, 'ACMO', 15)
+if __name__ == '__main__':
+    # Example usage:
+    # Load an image using OpenCV
+    path_image = r'C:\Users\udubin\Documents\Projects\MonoDepth\data\simu02\im_03.tif'
+    image = cv2.imread(path_image, cv2.IMREAD_GRAYSCALE)
+    image = image.astype(np.float64)  # Convert to double
+
+    # Call the focus measure function
+    #fm = focus_measure(image, 'CONT', 15) # nok
+    #fm = focus_measure(image, 'BREN', 15)
+    fm = focus_measure(image, 'GRAT', 15)
