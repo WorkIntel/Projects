@@ -102,7 +102,7 @@ class DepthEstimator:
         # assign
         self.imgL = frame[:,:,0]
         self.imgR = frame[:,:,1]
-        self.imgD = cv.convertScaleAbs(frame[:,:,2], alpha=10) 
+        self.imgD = cv.convertScaleAbs(frame[:,:,2], alpha=1) 
         return
       
     def init_roi(self, test_type = 1):
@@ -186,7 +186,7 @@ class DepthEstimator:
         grayR           = self.imgR
         # Calculates dense optical flow by Farneback method
         # https://docs.opencv.org/3.0-beta/modules/video/doc/motion_analysis_and_object_tracking.html#calcopticalflowfarneback
-        flow            = cv.calcOpticalFlowFarneback(grayL, grayR, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        flow            = cv.calcOpticalFlowFarneback(grayL, grayR, None, 0.5, 3, 5, 3, 5, 1.2, 0)
 
         # Computes the magnitude and angle of the 2D vectors
         magnitude, angle = cv.cartToPolar(flow[..., 0], flow[..., 1])
@@ -227,7 +227,8 @@ class DepthEstimator:
             img_show = self.imgC
         else:
             #self.imgD = np.repeat(self.imgD, 3, axis = 2)
-            img_show = self.imgC #np.concatenate((self.imgD, self.imgC ), axis = 1)
+            #img_show = self.imgC #np.concatenate((self.imgD, self.imgC ), axis = 1)
+            img_show = np.concatenate((self.imgD, self.imgC ), axis = 1)
             
         # deal with black and white
         
@@ -366,8 +367,8 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    #suite.addTest(TestDepthEstimator("test_read_stream"))
-    suite.addTest(TestDepthEstimator("test_dense_optical_flow"))
+    suite.addTest(TestDepthEstimator("test_read_stream"))
+    #suite.addTest(TestDepthEstimator("test_dense_optical_flow"))
 
 
     runner = unittest.TextTestRunner()
