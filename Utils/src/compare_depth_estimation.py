@@ -118,7 +118,13 @@ class DepthEstimator:
             roi = [220,140,420,340] # xlu, ylu, xrb, yrb      
         elif test_type == 4:
             roi = [200,120,440,360] # xlu, ylu, xrb, yrb            
-        return roi  
+        return roi 
+
+    def convert_disparity_to_depth(self):
+        "from GIL"
+        focal_len           = 175.910019
+        baseline            = 94.773
+        #replacementDepth    = focal_len *  baseline / (RectScaledInfra1.x - (maxLoc.x + RectScaledInfra2.x)); 
 
      
     def depth_opencv(self):
@@ -170,6 +176,33 @@ class DepthEstimator:
         self.imgC            = disparity_normalized
         self.tprint('Computing disparity... Done')
         return True
+    
+    def dense_optical_flow(self):
+        "image computation using more elaborate features"   
+        self.tprint('start processing')
+
+        # Converts each frame to grayscale - we previously only converted the first frame to grayscale
+        grayL           = self.imgL
+        grayR           = self.imgR
+        # Calculates dense optical flow by Farneback method
+        # https://docs.opencv.org/3.0-beta/modules/video/doc/motion_analysis_and_object_tracking.html#calcopticalflowfarneback
+        flow            = cv.calcOpticalFlowFarneback(grayL, grayR, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+        # Computes the magnitude and angle of the 2D vectors
+        magnitude, angle = cv.cartToPolar(flow[..., 0], flow[..., 1])
+        # Sets image hue according to the optical flow direction
+        # Creates an image filled with zero intensities with the same dimensions as the frame
+        mask            = np.zeros((grayL.shape[0],grayL.shape[1],3), dtype = grayL.dtype)
+        # Sets image saturation to maximum
+        mask[..., 1]    = 255        
+        mask[..., 0]    = angle * 180 / np.pi / 2
+        # Sets image value according to the optical flow magnitude (normalized)
+        mask[..., 2]    = cv.normalize(magnitude, None, 0, 255, cv.NORM_MINMAX)
+        # Converts HSV to RGB (BGR) color representation
+        rgb                 = cv.cvtColor(mask, cv.COLOR_HSV2BGR)
+        self.imgC           = rgb
+        self.tprint('Computing disparity... Done')
+        return True    
 
     # -----------------------------------------
     def show_images_left_right(self):
@@ -186,12 +219,18 @@ class DepthEstimator:
 
     def show_images_depth(self):
         "draw results of depth estimation"
-        if self.imgD is None or self.imgC is None:
+        if self.imgD is None and self.imgC is None:
             self.tprint('No images found')
             return False
+        
+        elif self.imgD is None:
+            img_show = self.imgC
+        else:
+            #self.imgD = np.repeat(self.imgD, 3, axis = 2)
+            img_show = self.imgC #np.concatenate((self.imgD, self.imgC ), axis = 1)
             
         # deal with black and white
-        img_show = np.concatenate((self.imgD, self.imgC ), axis = 1)
+        
         if img_show.shape[1] > 1600:
             img_show = cv.pyrDown(img_show)
 
@@ -266,6 +305,17 @@ class TestDepthEstimator(unittest.TestCase):
 
         self.assertFalse(p.imgD is None) 
 
+    def test_dense_optical_flow(self):
+        "depth compute using optical flow"
+        p = DepthEstimator()
+        p.init_stream()
+        ret  = False
+        while not ret:
+            p.read_stream()
+            p.dense_optical_flow()
+            ret = p.show_images_depth()
+
+        self.assertFalse(p.imgD is None) 
 
 # ----------------------
 #%% App
@@ -316,7 +366,9 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    suite.addTest(TestDepthEstimator("test_read_stream"))
+    #suite.addTest(TestDepthEstimator("test_read_stream"))
+    suite.addTest(TestDepthEstimator("test_dense_optical_flow"))
+
 
     runner = unittest.TextTestRunner()
     runner.run(suite)

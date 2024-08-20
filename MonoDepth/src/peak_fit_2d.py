@@ -113,6 +113,5 @@ if __name__ == '__main__':
         z        = create_zdata(xs, ys)
         xp, yp   = peak_fit_2d(z)
         print(xs, ys, xp, yp)
-
         show_3d(z)
    
