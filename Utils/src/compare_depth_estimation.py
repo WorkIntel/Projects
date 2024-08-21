@@ -202,7 +202,54 @@ class DepthEstimator:
         rgb                 = cv.cvtColor(mask, cv.COLOR_HSV2BGR)
         self.imgC           = rgb
         self.tprint('Computing disparity... Done')
-        return True    
+        return flow  
+
+    def block_matching(f1, f2, block_size=8, search_range=16):
+        """
+        Performs block matching motion estimation.
+
+        Args:
+            f1: The anchor frame image.
+            f2: The target frame image.
+            block_size: The size of the blocks (default: 8).
+            search_range: The maximum displacement for the search window (default: 16).
+
+        Returns:
+            A tuple (fp, mvx, mvy) where:
+                - fp: The predicted image.
+                - mvx: The horizontal motion vector field.
+                - mvy: The vertical motion vector field.
+        """
+
+        height, width = f1.shape[:2]
+        fp = np.zeros_like(f1)
+        mvx = np.zeros((height // block_size, width // block_size))
+        mvy = np.zeros((height // block_size, width // block_size))
+
+        for i in range(0, height - block_size + 1, block_size):
+            for j in range(0, width - block_size + 1, block_size):
+                mad_min = np.inf
+                best_dx, best_dy = 0, 0
+
+                for k in range(-search_range, search_range + 1):
+                    for l in range(-search_range, search_range + 1):
+                        if i + k >= 0 and i + k + block_size - 1 < height and \
+                        j + l >= 0 and j + l + block_size - 1 < width:
+                            block1 = f1[i:i + block_size, j:j + block_size]
+                            block2 = f2[i + k:i + k + block_size, j + l:j + l + block_size]
+                            mad = np.sum(np.abs(block1 - block2))
+
+                            if mad < mad_min:
+                                mad_min = mad
+                                best_dx, best_dy = k, l
+
+                fp[i:i + block_size, j:j + block_size] = f2[i + best_dy:i + best_dy + block_size, j + best_dx:j + best_dx + block_size]
+                iblk = i // block_size + 1
+                jblk = j // block_size + 1
+                mvx[iblk - 1, jblk - 1] = best_dx
+                mvy[iblk - 1, jblk - 1] = best_dy
+
+        return fp, mvx, mvy  
 
     # -----------------------------------------
     def show_images_left_right(self):
@@ -246,6 +293,29 @@ class DepthEstimator:
         ret = ch == ord('q')
         return ret
 
+
+    def show_flow(self, img, flow, step=16):
+        "draw flow lines"
+        QUIVER = (255, 100, 0)
+        h, w = img.shape[:2]
+        y, x = np.mgrid[step/2:h:step, step/2:w:step].reshape(2, -1).astype(int)
+        fx, fy = flow[y, x].T
+        lines = np.vstack([x, y, x + fx, y + fy]).T.reshape(-1, 2, 2)
+        lines = np.int32(lines + 0.5)
+        if len(img.shape)<3:
+            vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+        else:
+            vis = img
+
+        cv.polylines(vis, lines, 0, QUIVER)
+        for (x1, y1), (_x2, _y2) in lines:
+            cv.circle(vis, (x1, y1), 1, (0, 255, 0), -1)
+
+        cv.imshow('Flow (q-exit)', vis)
+        #self.tprint('show done')
+        ch = cv.waitKey(1)
+        ret = ch == ord('q')            
+        return ret
 
 
     def tprint(self, txt = '', level = 'I'):
@@ -318,6 +388,18 @@ class TestDepthEstimator(unittest.TestCase):
 
         self.assertFalse(p.imgD is None) 
 
+    def test_show_flow(self):
+        "draw flow"
+        p = DepthEstimator()
+        p.init_stream()
+        ret  = False
+        while not ret:
+            p.read_stream()
+            flow = p.dense_optical_flow()
+            ret  = p.show_flow(p.imgL, flow)          
+
+        self.assertFalse(p.imgD is None)  
+
 # ----------------------
 #%% App
 class App:
@@ -367,9 +449,9 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    suite.addTest(TestDepthEstimator("test_read_stream"))
-    #suite.addTest(TestDepthEstimator("test_dense_optical_flow"))
-
+    #suite.addTest(TestDepthEstimator("test_read_stream")) # ok
+    #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
+    suite.addTest(TestDepthEstimator("test_show_flow"))
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
