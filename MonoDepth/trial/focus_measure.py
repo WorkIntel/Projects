@@ -217,9 +217,9 @@ def lapm_focus_measure(image, wsize):
         The computed focus measure as a numpy array.
     """
 
-    M = np.array([-1, 2, -1])
-    Lx = convolve(image, M, mode='reflect')
-    Ly = convolve(image, M[np.newaxis, :], mode='reflect')
+    M = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]) #np.array([-1, 2, -1])
+    Lx = convolve2d(image, M, mode='same', boundary = 'wrap')
+    Ly = convolve2d(image, M.T, mode='same',  boundary = 'wrap')
     FM = np.abs(Lx) + np.abs(Ly)
 
     if wsize == 0:

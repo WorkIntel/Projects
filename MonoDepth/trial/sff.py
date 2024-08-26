@@ -83,7 +83,8 @@ import numpy as np
 import time
 import cv2
 import argparse
-
+from scipy.signal import convolve2d #, median_filter
+from focus_measure import focus_measure
 # -------------------------
 
 def read_images(imlist, opts):
@@ -122,7 +123,7 @@ def read_images(imlist, opts):
 
 
 # -------------------------
-def compute_sff(images, opts, focus_measure_func):
+def compute_sff(images, opts):
     """
     Computes the shape from focus (SFF) depth map and reliability measure.
 
@@ -141,7 +142,9 @@ def compute_sff(images, opts, focus_measure_func):
     start_time = time.time()
     fm = np.zeros((M, N, P))
     for p in range(P):
-        fm[:, :, p] = focus_measure_func(images[:, :, p], opts.fmeasure, opts.nhsize)
+        
+        #fm[:, :, p] = focus_measure_func(images[:, :, p], opts.fmeasure, opts.nhsize)
+        fm[:, :, p] = focus_measure(images[:, :, p], opts['fmeasure'], opts['nhsize'])
         print(f"\rFmeasure [{(p+1):02d}/{P:02d}]", end="")
     print()
     end_time = time.time()
@@ -262,9 +265,9 @@ def gauss3P(x, Y):
     Index2 = IM.flatten() * P * N + IN.flatten() * P + Ic
     Index3 = IM.flatten() * P * N + IN.flatten() * P + Ic + STEP
 
-    x1 = x.reshape(M, N)[Ic - STEP]
-    x2 = x.reshape(M, N)[Ic]
-    x3 = x.reshape(M, N)[Ic + STEP]
+    x1 = x[Ic - STEP].reshape(M, N)
+    x2 = x[Ic].reshape(M, N)
+    x3 = x[Ic + STEP].reshape(M, N)
     y1 = np.log(Y.flat[Index1]).reshape(M, N)
     y2 = np.log(Y.flat[Index2]).reshape(M, N)
     y3 = np.log(Y.flat[Index3]).reshape(M, N)
