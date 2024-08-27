@@ -26,13 +26,30 @@ import sys
 sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
 
-import logging as log
-log.basicConfig(stream=sys.stdout, level=log.DEBUG, format='[%(asctime)s.%(msecs)03d] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',  datefmt="%M:%S")
-log.getLogger('matplotlib.font_manager').disabled = True
-log.getLogger('matplotlib').setLevel(log.WARNING)
-log.getLogger('PIL').setLevel(log.WARNING)
+# import logging as log
+# log.basicConfig(stream=sys.stdout, level=log.DEBUG, format='[%(asctime)s.%(msecs)03d] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',  datefmt="%M:%S")
+# log.getLogger('matplotlib.font_manager').disabled = True
+# log.getLogger('matplotlib').setLevel(log.WARNING)
+# log.getLogger('PIL').setLevel(log.WARNING)
 
 import matplotlib.pyplot as plt
+
+#%% Logger
+import logging
+log         = logging.getLogger("robot")
+#formatter   = logging.Formatter('[%(asctime)s.%(msecs)03d] {%(filename)6s:%(lineno)3d} %(levelname)s - %(message)s', datefmt="%M:%S", style="{")
+formatter   = logging.Formatter('[%(asctime)s] - [%(filename)12s:%(lineno)3d] - %(levelname)s - %(message)s')
+log.setLevel("DEBUG")
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel("DEBUG")
+console_handler.setFormatter(formatter)
+log.addHandler(console_handler)
+
+# file_handler = logging.FileHandler("main_app.log", mode="a", encoding="utf-8")
+# file_handler.setLevel("WARNING")
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
 
 
 #%% Main
@@ -249,7 +266,8 @@ class DepthEstimator:
                 mvx[iblk - 1, jblk - 1] = best_dx
                 mvy[iblk - 1, jblk - 1] = best_dy
 
-        return fp, mvx, mvy  
+        flow = np.stack((mvx,mvy),axis = 2)
+        return fp, flow  
 
     # -----------------------------------------
     def show_images_left_right(self):
@@ -272,8 +290,12 @@ class DepthEstimator:
         
         elif self.imgD is None:
             img_show = self.imgC
+
+        elif np.all(self.imgD.shape == self.imgC.shape):
+            img_show = np.concatenate((self.imgD, self.imgC ), axis = 1)
+
         else:
-            #self.imgD = np.repeat(self.imgD, 3, axis = 2)
+            self.imgD = np.repeat(self.imgD[:,:,np.newaxis], 3, axis = 2)
             #img_show = self.imgC #np.concatenate((self.imgD, self.imgC ), axis = 1)
             img_show = np.concatenate((self.imgD, self.imgC ), axis = 1)
             
@@ -292,7 +314,6 @@ class DepthEstimator:
         ch = cv.waitKey(1)
         ret = ch == ord('q')
         return ret
-
 
     def show_flow(self, img, flow, step=16):
         "draw flow lines"
@@ -400,6 +421,15 @@ class TestDepthEstimator(unittest.TestCase):
 
         self.assertFalse(p.imgD is None)  
 
+    def test_block_matching(self):
+        "depth from block matching - bruit force"
+        p           = DepthEstimator()
+        p.init_image(2)
+        p.show_images_left_right()
+        img, flow = p.block_matching(p.imgL, p.imgR, block_size=8)
+        p.show_flow(img, flow, step=8)
+        self.assertFalse(p.imgD is None)          
+
 # ----------------------
 #%% App
 class App:
@@ -449,9 +479,10 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    #suite.addTest(TestDepthEstimator("test_read_stream")) # ok
+    suite.addTest(TestDepthEstimator("test_read_stream")) # ok
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
-    suite.addTest(TestDepthEstimator("test_show_flow"))
+    #suite.addTest(TestDepthEstimator("test_show_flow"))
+    #suite.addTest(TestDepthEstimator("test_block_matching"))
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
