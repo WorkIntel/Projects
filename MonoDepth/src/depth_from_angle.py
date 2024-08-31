@@ -7,6 +7,7 @@ Analyze depth from optical flow and sensor angle rotation
 -----------------------------
  Ver    Date     Who    Descr
 -----------------------------
+0102   31.09.24 UD     Robot chess.
 0101   21.07.24 UD     Started chess. 
 -----------------------------
 """
@@ -154,7 +155,7 @@ class DataGenerator:
         return self.img
 
 #%% Estimation
-class DepthFromMotion:
+class DepthFromAngle:
     """ 
     Uses several images to match points and estimate the depth
     """
@@ -162,9 +163,10 @@ class DepthFromMotion:
     def __init__(self):
 
         self.frame_size = (640,480)
-        self.cam_matrix = np.array([[1000,0,self.frame_size[0]/2],[0,1000,self.frame_size[1]/2],[0,0,1]], dtype = np.float32)
-        self.cam_distort= np.array([0,0,0,0,0],dtype = np.float32)     
 
+        self.init_camera_params()
+        self.init_pattern()
+ 
 
     def init_camera_params(self):
         """
@@ -173,6 +175,13 @@ class DepthFromMotion:
         self.cam_matrix = np.array([[1000,0,self.frame_size[0]/2],[0,1000,self.frame_size[1]/2],[0,0,1]], dtype = np.float32)
         self.cam_distort= np.array([0,0,0,0,0],dtype = np.float32)     
 
+    def init_pattern(self, pattern_size = (9,6), square_size = 10.0):
+        # chessboard pattern init
+        self.pattern_points = np.zeros( (np.prod(pattern_size), 3), np.float32 )
+        self.pattern_points[:,:2] = np.indices(pattern_size).T.reshape(-1, 2)
+        self.pattern_points *= square_size
+        self.pattern_size    = pattern_size
+        self.square_size     = square_size
         
     def detect_points(self, rgb_image):
         """
@@ -206,11 +215,7 @@ class DepthFromMotion:
                 
         return objects
  
-    def init_pattern(self, pattern_size = (9,6), square_size = 10.5):
-        # chessboard pattern init
-        self.pattern_points = np.zeros( (np.prod(pattern_size), 3), np.float32 )
-        self.pattern_points[:,:2] = np.indices(pattern_size).T.reshape(-1, 2)
-        self.pattern_points *= square_size
+
         
     def find_corners(self,color_image):
         image           = cv.cvtColor(color_image, cv.COLOR_BGR2GRAY)
@@ -235,10 +240,10 @@ class DepthFromMotion:
     
     def draw_corners(self, color_image, corners):
         # color_image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)
-        #cv.drawChessboardCorners(color_image, self.pattern_size, corners, True)
+        cv.drawChessboardCorners(color_image, self.pattern_size, corners, True)
         
         cv.imshow('Calib Images',color_image)
-        cv.waitKey(1000)
+        cv.waitKey(10)
 
         return color_image
     
@@ -249,9 +254,9 @@ class DepthFromMotion:
 
         return rvec.flatten(), tvec.flatten()
     
-    def calibrate_lens(self,image_list):
+    def calibrate_lens(self, image_list):
         "lens calibration "
-        camera_matrix   = np.eye((3,3))
+        camera_matrix   = np.eye(3)
         dist_coeffs     = np.zeros(5)
         if len(image_list)<1:
             self.Print('Found no images','E')
@@ -278,12 +283,15 @@ class DepthFromMotion:
             # show
             self.draw_corners(img, corners)
             
-    #    rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv.calibrateCamera(obj_points, img_points, (w,h))
-        cv.calibrateCamera(obj_points, img_points, (w,h), camera_matrix, dist_coeffs)
+        #rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv.calibrateCamera(obj_points, img_points, (w,h))
+        #cv.calibrateCamera(obj_points, img_points, (w,h), camera_matrix, dist_coeffs)
         # UD - similar
-        #ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(obj_points, img_points, (w,h) ,cv.CALIB_RATIONAL_MODEL,None)
-        cv.destroyAllWindows()
+        rms, camera_matrix, dist_coeffs, rvecs, tvecs = cv.calibrateCamera(obj_points, img_points, (w,h) ,cv.CALIB_RATIONAL_MODEL,None)
         
+        
+        print('RMS: ', rms)
+        print(camera_matrix, dist_coeffs)
+        #cv.destroyAllWindows()
         return camera_matrix, dist_coeffs
  
     def Print(self, txt='',level='I'):
@@ -406,25 +414,27 @@ class DepthFromMotion:
 
 # ----------------------
 #%% Tests
-class TestDepthFromMotion(unittest.TestCase):
+class TestDepthFromAngle(unittest.TestCase):
 
-    def test_image_show(self):
-        p = DepthFromMotion()
-        p.init_image(1)
-        poses = [[0,0,100,0,0,45,10]]
-        p.show_image_with_axis(p.img,poses)
+    def test_calibrate_lens(self):
+        "lens distortion"
+        p = DepthFromAngle()
+        f = r'C:\Data\Depth\RobotAngle\*.png'
+        imlist = glob.glob(f)
+        p.calibrate_lens(imlist)
+        self.assertFalse(p.cam_matrix is None)  
+
+    def test_run_pose_estimation(self):
+        p = DepthFromAngle()
+        f = r'C:\Data\Depth\RobotAngle'
+        p.run_pose_estimation(f)
         self.assertFalse(p.img is None)
 
-    def test_init_img3d(self):
-        "XYZ point cloud structure init"
-        p = DepthFromMotion()
-        p.init_image(1)
-        img3d = p.init_img3d()
-        self.assertFalse(img3d is None)    
+  
 
     def test_compute_img3d(self):
         "XYZ point cloud structure init and compute"
-        p       = DepthFromMotion()
+        p       = DepthFromAngle()
         img     = p.init_image(1)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -432,7 +442,7 @@ class TestDepthFromMotion(unittest.TestCase):
 
     def test_show_img3d(self):
         "XYZ point cloud structure init and compute"
-        p       = DepthFromMotion()
+        p       = DepthFromAngle()
         img     = p.init_image(1)
         img3d   = p.init_img3d(img)
         imgXYZ  = p.compute_img3d(img)
@@ -449,26 +459,26 @@ if __name__ == '__main__':
     #print(__doc__)
 
      #unittest.main()
-    # suite = unittest.TestSuite()
+    suite = unittest.TestSuite()
 
-    # suite.addTest(TestDepthFromMotion("test_image_show"))
-    # suite.addTest(TestDepthFromMotion("test_init_img3d")) # ok
-    # suite.addTest(TestDepthFromMotion("test_compute_img3d")) # ok
-    # suite.addTest(TestDepthFromMotion("test_show_img3d")) # 
+    suite.addTest(TestDepthFromAngle("test_calibrate_lens"))
+    # suite.addTest(TestDepthFromAngle("test_init_img3d")) # ok
+    # suite.addTest(TestDepthFromAngle("test_compute_img3d")) # ok
+    #suite.addTest(TestDepthFromAngle("test_show_img3d")) # 
    
-    # runner = unittest.TextTestRunner()
-    # runner.run(suite)
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
 
-    p0 = np.array([[364,616],[974,468],[878,305]])
-    pn = np.array([[378,613],[991,468],[894,304]])
-    pp = np.array([[326,624],[938,470],[843,304]])
+    # p0 = np.array([[364,616],[974,468],[878,305]])
+    # pn = np.array([[378,613],[991,468],[894,304]])
+    # pp = np.array([[326,624],[938,470],[843,304]])
 
-    def dist(p0,p1):
-        d = np.sqrt((p0[:,0] - p1[:,0])**2 +(p0[:,1] - p1[:,1])**2)
-        print(d)
+    # def dist(p0,p1):
+    #     d = np.sqrt((p0[:,0] - p1[:,0])**2 +(p0[:,1] - p1[:,1])**2)
+    #     print(d)
 
-    dist(p0,pn)
-    dist(p0,pp)
+    # dist(p0,pn)
+    # dist(p0,pp)
                   
 
 
