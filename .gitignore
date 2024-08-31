@@ -2,7 +2,7 @@
 *.mp4
 *.pdf
 *.pyc
-#*.png
+*.png
 *.jpg
 *.pptx
 *.webm
@@ -14,7 +14,7 @@
 *.mat
 *.npy
 /Barcode/trial
-#/MonoDepth/data
+/MonoDepth/data
 /Motion/trial
 /Pose6D/trial
 
