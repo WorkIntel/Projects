@@ -365,6 +365,8 @@ class DepthFromAngle:
                 raise Exception("chessboard calibrate_lens Failed to find corners in img")
             
 
+            #corners_ud = cv.undistortPoints(corners, self.cam_matrix, self.cam_distort)
+
             img_points.append(corners.reshape(-1, 2))
             obj_points.append(self.pattern_points)
 
