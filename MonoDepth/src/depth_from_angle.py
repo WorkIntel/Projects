@@ -19,6 +19,7 @@ import numpy as np
 import logging
 import glob
 import unittest
+from scipy.spatial.transform import Rotation as Rot
 
 import cv2 as cv
 
@@ -164,16 +165,19 @@ class DepthFromAngle:
 
         self.frame_size = (640,480)
 
-        self.init_camera_params()
         self.init_pattern()
- 
+        self.init_camera_params()
 
     def init_camera_params(self):
         """
         
         """
         self.cam_matrix = np.array([[1000,0,self.frame_size[0]/2],[0,1000,self.frame_size[1]/2],[0,0,1]], dtype = np.float32)
-        self.cam_distort= np.array([0,0,0,0,0],dtype = np.float32)     
+        self.cam_distort= np.array([0,0,0,0,0],dtype = np.float32)  
+
+        isOk = self.load_params()
+        if not isOk:
+            self.Print('camera calibration is needed')  
 
     def init_pattern(self, pattern_size = (9,6), square_size = 10.0):
         # chessboard pattern init
@@ -182,6 +186,32 @@ class DepthFromAngle:
         self.pattern_points *= square_size
         self.pattern_size    = pattern_size
         self.square_size     = square_size
+
+    def save_params(self):
+        "camera params save"
+        # Save
+        dictionary = {
+            'cam_matrix' : self.cam_matrix,
+            'cam_distort': self.cam_distort,
+            }
+        np.save('settings.npy', dictionary) 
+        self.Print('saved to file')
+
+    def load_params(self):
+        # Load
+        try:
+            read_dictionary = np.load('settings.npy',allow_pickle='TRUE').item()
+        except Exception as e:
+            print(e)
+            self.Print('File not found - run calibration')
+            return False
+        
+        print(read_dictionary['cam_matrix']) # displays "world"   
+        print(read_dictionary['cam_distort']) 
+
+        self.cam_matrix    = read_dictionary['cam_matrix'] 
+        self.cam_distort   = read_dictionary['cam_distort']
+        return True
         
     def detect_points(self, rgb_image):
         """
@@ -215,7 +245,6 @@ class DepthFromAngle:
                 
         return objects
  
-
         
     def find_corners(self,color_image):
         image           = cv.cvtColor(color_image, cv.COLOR_BGR2GRAY)
@@ -238,14 +267,21 @@ class DepthFromAngle:
         dist = np.sqrt(np.sum((points_xy[0,:] - points_xy[1,:])**2))
         return color_image, dist  
     
-    def draw_corners(self, color_image, corners):
+    def draw_corners(self, color_image, corners, name = 'Calib Images'):
         # color_image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)
         cv.drawChessboardCorners(color_image, self.pattern_size, corners, True)
         
-        cv.imshow('Calib Images',color_image)
-        cv.waitKey(10)
+        cv.imshow(name,color_image)
+        cv.waitKey(1000)
 
         return color_image
+    
+    def convert_rvec_to_euler(self, rvec):
+        "euler representation"
+        #R           = Rot.from_quat(rvec).as_matrix()
+        avec         = Rot.from_rotvec(rvec).as_euler('xyz',degrees=True)
+        #avec        = Rot.from_matrix(R).as_euler('zyx',degrees=True)
+        return avec
     
     def get_object_pose(self, object_points, image_points, camera_matrix, dist_coeffs):
         #ret, rvec, tvec = cv.solvePnP(object_points, image_points, camera_matrix, dist_coeffs)
@@ -292,7 +328,62 @@ class DepthFromAngle:
         print('RMS: ', rms)
         print(camera_matrix, dist_coeffs)
         #cv.destroyAllWindows()
-        return camera_matrix, dist_coeffs
+
+        self.cam_matrix, self.cam_distort = camera_matrix, dist_coeffs
+        self.save_params()  
+        return True
+    
+    def compute_corner_distances(self, corners_left, corners_right):
+        "distances between images"
+        corners_left = corners_left.squeeze()
+        corners_right = corners_right.squeeze()
+        dx            = corners_left[:,0] - corners_right[:,0]
+        dy            = corners_left[:,1] - corners_right[:,1]
+        dist          = np.sqrt(dx**2 + dy**2)
+        return dist.mean()
+
+    def distance_between_images(self, fpath):
+        "split data set on 3 and estimate distance between points "
+        image_list  = glob.glob(fpath)
+        
+        img_points, obj_points = [], []
+        h,w = 0, 0
+        count = 0
+        for imgName in image_list:
+            # protect from non image files
+            try:
+                img         = cv.imread(imgName)
+            except BaseException as e:
+                #print(e)
+                self.Print('Skipping file %s' %imgName)
+                continue
+            
+            if img is None: continue
+            h, w            = img.shape[:2]
+            found,corners   = self.find_corners(img)
+            if not found:
+                raise Exception("chessboard calibrate_lens Failed to find corners in img")
+            
+
+            img_points.append(corners.reshape(-1, 2))
+            obj_points.append(self.pattern_points)
+
+            rvec, tvec = self.get_object_pose(self.pattern_points, corners, self.cam_matrix, self.cam_distort)
+            avec       = self.convert_rvec_to_euler(rvec)
+            self.Print('%d : T = %s, A = %s' %(count, str(tvec), str(avec)))
+
+            # show
+            self.draw_corners(img, corners,'Img %d' %count)
+            count = (count + 1) % 3  
+
+            # estimate distance
+            if count == 0:
+                corners_left  = img_points[-2] 
+                corners_right = img_points[-1]   
+                average_dist  = self.compute_corner_distances(corners_left, corners_right)  
+                self.Print('%d : D = %s' %(count, str(average_dist)))   
+
+        return True    
  
     def Print(self, txt='',level='I'):
         
@@ -307,33 +398,7 @@ class DepthFromAngle:
             logging.error(ptxt)  
            
         print(ptxt)
-
-    def run_pose_estimation(self, fpath = ''):
-        "compute calibration matrices"
-        corner_list         = []
-        obj_pose_list       = []
-        img_list            = glob.glob(fpath)
-
-        
-        camera_matrix, dist_coeffs = self.calibrate_lens(img_list)
-
-        for i, img_name in enumerate(img_list):
-
-            # protect from non image files
-            try:
-                img         = cv.imread(img_name)
-            except BaseException as e:
-                #print(e)
-                self.Print('Skipping file %s' %img_name)
-                continue
-            
-            if img is None: continue
-            found, corners = self.find_corners(img)
-            corner_list.append(corners)
-            if not found:
-                raise Exception("Failed to find corners in img # %d" % i)
-            rvec, tvec = self.get_object_pose(self.pattern_points, corners, camera_matrix, dist_coeffs)
-            #obj_pose_list.append(object_pose)    
+   
     
     def compute_point_distances(self, fpath):
         "compute point distance ratio to understand distortion"
@@ -418,39 +483,20 @@ class TestDepthFromAngle(unittest.TestCase):
 
     def test_calibrate_lens(self):
         "lens distortion"
-        p = DepthFromAngle()
-        f = r'C:\Data\Depth\RobotAngle\*.png'
-        imlist = glob.glob(f)
+        p       = DepthFromAngle()
+        f       = r'C:\Data\Depth\RobotAngle\*.png'
+        imlist  = glob.glob(f)
         p.calibrate_lens(imlist)
         self.assertFalse(p.cam_matrix is None)  
 
-    def test_run_pose_estimation(self):
-        p = DepthFromAngle()
-        f = r'C:\Data\Depth\RobotAngle'
-        p.run_pose_estimation(f)
-        self.assertFalse(p.img is None)
-
-  
-
-    def test_compute_img3d(self):
-        "XYZ point cloud structure init and compute"
+    def test_distance_between_images(self):
         p       = DepthFromAngle()
-        img     = p.init_image(1)
-        img3d   = p.init_img3d(img)
-        imgXYZ  = p.compute_img3d(img)
-        self.assertFalse(imgXYZ is None)     
+        #f       = r'C:\Data\Depth\RobotAngle\*.png'
+        f       = r'.\data\robot_cam_rotation\*.png'
+        isOk    = p.distance_between_images(f)
+        self.assertTrue(isOk)  
 
-    def test_show_img3d(self):
-        "XYZ point cloud structure init and compute"
-        p       = DepthFromAngle()
-        img     = p.init_image(1)
-        img3d   = p.init_img3d(img)
-        imgXYZ  = p.compute_img3d(img)
-        roi     = p.init_roi(1)
-        x0,y0,x1,y1 = roi
-        roiXYZ    = imgXYZ[y0:y1,x0:x1,:]
-        p.show_points_3d_with_normal(roiXYZ)
-        self.assertFalse(imgXYZ is None)                      
+
 
 
       
@@ -461,10 +507,9 @@ if __name__ == '__main__':
      #unittest.main()
     suite = unittest.TestSuite()
 
-    suite.addTest(TestDepthFromAngle("test_calibrate_lens"))
-    # suite.addTest(TestDepthFromAngle("test_init_img3d")) # ok
-    # suite.addTest(TestDepthFromAngle("test_compute_img3d")) # ok
-    #suite.addTest(TestDepthFromAngle("test_show_img3d")) # 
+    #suite.addTest(TestDepthFromAngle("test_calibrate_lens"))
+    suite.addTest(TestDepthFromAngle("test_distance_between_images")) # ok
+
    
     runner = unittest.TextTestRunner()
     runner.run(suite)
