@@ -163,7 +163,10 @@ class DepthFromAngle:
 
     def __init__(self):
 
-        self.frame_size = (640,480)
+        self.frame_size     = (640,480)
+        self.focal_length   = 3 # mm
+        self.pixel_size     = 1 #7.5e-3 # mm - includes decimation
+        self.base_line      = 3 # mm - shift in focus due to rotation
 
         self.init_pattern()
         self.init_camera_params()
@@ -212,40 +215,7 @@ class DepthFromAngle:
         self.cam_matrix    = read_dictionary['cam_matrix'] 
         self.cam_distort   = read_dictionary['cam_distort']
         return True
-        
-    def detect_points(self, rgb_image):
-        """
-        
-        """
-        
-        # select object to work with
-        objects = {'objectId': [], 'rvecAll': [], 'tvecAll': [], 'objectQ': []}
-        
-        if len(self.camera_matrix)<1:
-            self.Print('Load-update chess camera matrix','E')
-            return objects
-         
-        found, corners      = self.find_corners(rgb_image)
-        if not found:
-            #self.Print("Failed to find corners in img" )
-            return objects
-        
-        # in case that image is scaled
-        corners             = corners/self.scale_factor
-        
-        rvec, tvec          = self.get_object_pose(self.pattern_points, corners, self.camera_matrix, self.dist_coeffs)        
-        
-        #self.res.res        = []    
-        self.res.objects               = corners  # debug chess pattern
-        
-        objects['objectId']            = [1]
-        objects['rvecAll']             = [rvec]
-        objects['tvecAll']             = [tvec]
-        objects['objectQ']             = [1]  # reliable
-                
-        return objects
- 
-        
+            
     def find_corners(self,color_image):
         image           = cv.cvtColor(color_image, cv.COLOR_BGR2GRAY)
         found, corners  = cv.findChessboardCorners(image, tuple(self.pattern_size))
@@ -342,6 +312,39 @@ class DepthFromAngle:
         dist          = np.sqrt(dx**2 + dy**2)
         return dist.mean()
 
+    def compute_point_distances(self, corners_left, corners_right):
+        "distances between points scaled "
+        corners_left = corners_left.squeeze()
+        corners_right = corners_right.squeeze()
+        dx            = corners_left[:,0] - corners_right[:,0]
+        dy            = corners_left[:,1] - corners_right[:,1]
+        dist_pix      = np.sqrt(dx**2 + dy**2)
+
+        f             = self.focal_length    # mm
+        pixel_size    = self.pixel_size    # = 10e-3 # mm - includes decimation
+        b             = self.base_line     # = 1 # mm - shift in focus due to rotation
+        alpha         = 5/180*np.pi # mm
+  
+        Z             = b*f/(dist_pix*pixel_size - 2*alpha*f)
+        return Z.min(), Z.mean(), Z.max()
+    
+    def compute_undistorted_point_distances(self, corners_left, corners_right):
+        "distances between undistorted points  "
+        corners_left  = corners_left.squeeze()
+        corners_right = corners_right.squeeze()
+        dx            = corners_left[:,0] - corners_right[:,0]
+        dy            = corners_left[:,1] - corners_right[:,1]
+        dist_pix      = np.sqrt(dx**2 + dy**2)
+        dist_pix      = dx
+        
+        pixel_size    = self.pixel_size    # = 10e-3 # mm - includes decimation
+        b             = self.base_line     # = 1 # mm - shift in focus due to rotation
+        alpha         = 5/180*np.pi # mm
+  
+        dist_rad      = dist_pix*pixel_size
+        Z             = b/(2*alpha + dist_rad)
+        return Z.min(), Z.mean(), Z.max()   
+
     def distance_between_images(self, fpath):
         "split data set on 3 and estimate distance between points "
         image_list  = glob.glob(fpath)
@@ -386,23 +389,72 @@ class DepthFromAngle:
                 self.Print('%d : D = %s' %(count, str(average_dist)))   
 
         return True    
+    
+    def distance_between_points(self, fpath):
+        "split data set on 3 and estimate distance between points "
+        image_list  = glob.glob(fpath)
+        
+        img_points, obj_points = [], []
+        tvecs = []
+        h,w = 0, 0
+        count = 0
+        for imgName in image_list:
+            # protect from non image files
+            try:
+                img         = cv.imread(imgName)
+            except BaseException as e:
+                #print(e)
+                self.Print('Skipping file %s' %imgName)
+                continue
+            
+            if img is None: continue
+            h, w            = img.shape[:2]
+            found,corners   = self.find_corners(img)
+            if not found:
+                raise Exception("chessboard calibrate_lens Failed to find corners in img")
+            
+
+            corners_ud = cv.undistortPoints(corners, self.cam_matrix, self.cam_distort)
+
+            img_points.append(corners_ud.reshape(-1, 2))
+            obj_points.append(self.pattern_points)
+
+            rvec, tvec = self.get_object_pose(self.pattern_points, corners, self.cam_matrix, self.cam_distort)
+            avec       = self.convert_rvec_to_euler(rvec)
+            self.Print('%d : T = %s, A = %s' %(count, str(tvec), str(avec)))
+            tvecs.append(tvec)
+
+            # show
+            self.draw_corners(img, corners,'Img %d' %count)
+            count = (count + 1) % 3  
+
+            # estimate distance
+            if count == 0:
+                tvec            = tvecs[-3]
+                corners_left    = img_points[-2] 
+                corners_right   = img_points[-1]   
+                #z_min,z_mean,z_max  = self.compute_point_distances(corners_left, corners_right) 
+                z_min,z_mean,z_max  = self.compute_undistorted_point_distances(corners_left, corners_right) 
+                
+                self.Print('%d : D = %s, Z = %s' %(count, str(tvec[2]), str([z_min,z_mean,z_max])))   
+
+        return True        
  
     def Print(self, txt='',level='I'):
         
         if level == 'I':
-            ptxt = 'I: CB: %s' % txt
+            ptxt = 'I: DFA: %s' % txt
             logging.info(ptxt)  
         if level == 'W':
-            ptxt = 'W: CB: %s' % txt
+            ptxt = 'W: DFA: %s' % txt
             logging.warning(ptxt)  
         if level == 'E':
-            ptxt = 'E: CB: %s' % txt
+            ptxt = 'E: DFA: %s' % txt
             logging.error(ptxt)  
            
         print(ptxt)
    
-    
-    def compute_point_distances(self, fpath):
+    def compute_point_distances_old(self, fpath):
         "compute point distance ratio to understand distortion"
         img_list            = glob.glob(fpath)
         if len(img_list)<1:
@@ -498,7 +550,11 @@ class TestDepthFromAngle(unittest.TestCase):
         isOk    = p.distance_between_images(f)
         self.assertTrue(isOk)  
 
-
+    def test_distance_between_points(self):
+        p       = DepthFromAngle()
+        f       = r'.\data\robot_cam_rotation\*.png'
+        isOk    = p.distance_between_points(f)
+        self.assertTrue(isOk)  
 
 
       
@@ -510,7 +566,8 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
 
     #suite.addTest(TestDepthFromAngle("test_calibrate_lens"))
-    suite.addTest(TestDepthFromAngle("test_distance_between_images")) # ok
+    #suite.addTest(TestDepthFromAngle("test_distance_between_images")) # ok
+    suite.addTest(TestDepthFromAngle("test_distance_between_points")) # ok
 
    
     runner = unittest.TextTestRunner()
