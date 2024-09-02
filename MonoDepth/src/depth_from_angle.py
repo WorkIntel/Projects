@@ -165,8 +165,8 @@ class DepthFromAngle:
 
         self.frame_size     = (640,480)
         self.focal_length   = 3 # mm
-        self.pixel_size     = 1 #7.5e-3 # mm - includes decimation
-        self.base_line      = 3 # mm - shift in focus due to rotation
+        self.pixel_size     = 8e-3 # mm - includes decimation
+        self.base_line      = 2 # mm - shift in focus due to rotation
 
         self.init_pattern()
         self.init_camera_params()
@@ -319,6 +319,7 @@ class DepthFromAngle:
         dx            = corners_left[:,0] - corners_right[:,0]
         dy            = corners_left[:,1] - corners_right[:,1]
         dist_pix      = np.sqrt(dx**2 + dy**2)
+        dist_pix      = dx
 
         f             = self.focal_length    # mm
         pixel_size    = self.pixel_size    # = 10e-3 # mm - includes decimation
@@ -416,7 +417,7 @@ class DepthFromAngle:
 
             corners_ud = cv.undistortPoints(corners, self.cam_matrix, self.cam_distort)
 
-            img_points.append(corners_ud.reshape(-1, 2))
+            img_points.append(corners.reshape(-1, 2))
             obj_points.append(self.pattern_points)
 
             rvec, tvec = self.get_object_pose(self.pattern_points, corners, self.cam_matrix, self.cam_distort)
@@ -433,12 +434,13 @@ class DepthFromAngle:
                 tvec            = tvecs[-3]
                 corners_left    = img_points[-2] 
                 corners_right   = img_points[-1]   
-                #z_min,z_mean,z_max  = self.compute_point_distances(corners_left, corners_right) 
-                z_min,z_mean,z_max  = self.compute_undistorted_point_distances(corners_left, corners_right) 
+                z_min,z_mean,z_max  = self.compute_point_distances(corners_left, corners_right) 
+                #z_min,z_mean,z_max  = self.compute_undistorted_point_distances(corners_left, corners_right) 
                 
                 self.Print('%d : D = %s, Z = %s' %(count, str(tvec[2]), str([z_min,z_mean,z_max])))   
 
         return True        
+    
  
     def Print(self, txt='',level='I'):
         
@@ -553,6 +555,8 @@ class TestDepthFromAngle(unittest.TestCase):
     def test_distance_between_points(self):
         p       = DepthFromAngle()
         f       = r'.\data\robot_cam_rotation\*.png'
+        #p.pixel_size = 1 # points are scaled
+        p.pixel_size = 5e-3 
         isOk    = p.distance_between_points(f)
         self.assertTrue(isOk)  
 
