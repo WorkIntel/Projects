@@ -33,7 +33,7 @@ import cv2 as cv
 class RealSense(object):
     def __init__(self,  mode = 'rgb', use_ir = True, **params):
         
-        self.frame_size = (640,480) #(1280, 720)
+        self.frame_size = (1280, 720)#(640,480) #
         self.count      = 0
         self.mode       = 'rgb' if mode is None else mode 
         self.use_ir     = False if use_ir is None else use_ir
@@ -56,11 +56,13 @@ class RealSense(object):
 
         #  Get device product line for setting a supporting resolution
         pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
-        pipeline_profile = self.config.resolve(pipeline_wrapper)
-        device = pipeline_profile.get_device()
-        device_product_line = str(device.get_info(rs.camera_info.product_line))
-        print('Device product line : ', device_product_line)
-        #print('Real Sense version : ', rs.__version__)
+        try: # 545
+            pipeline_profile = self.config.resolve(pipeline_wrapper)
+            device = pipeline_profile.get_device()
+            device_product_line = str(device.get_info(rs.camera_info.product_line))
+            print('Device product line : ', device_product_line)
+        except:
+            print('Real Sense new version - possibly will require a new driver version')
 
         #found_rgb = False
         # for s in device.sensors:

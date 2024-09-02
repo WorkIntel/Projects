@@ -513,9 +513,9 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
     #suite.addTest(TestDepthEstimator("test_show_images_left_right"))
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
-    suite.addTest(TestDepthEstimator("test_depth_opencv"))
+    #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    #suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
+    suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
     #suite.addTest(TestDepthEstimator("test_show_flow"))
     #suite.addTest(TestDepthEstimator("test_block_matching"))
