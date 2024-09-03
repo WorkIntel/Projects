@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from stft2d import stft2d
 from istft2d import istft2d
+import cv2 as cv
 
 def stft2d_test(window_size=32, corr_enabled=False, test_type=1, fig_num=2):
   """
@@ -19,9 +20,10 @@ def stft2d_test(window_size=32, corr_enabled=False, test_type=1, fig_num=2):
       image = np.random.randn(256, 256) * 30 + 128
   elif test_type == 2:  # Test simple image
       # Assuming 'circuit' is a predefined image
-      image = np.array(circuit)
+      image = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_1004.png")
+      image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
   elif test_type == 3:  # Test different size
-      image = np.zeros((123, 345)) * 3
+      image = np.random.randn(160, 192) * 10
       image[50:58, 50:58] = 180
   elif test_type == 11:  # Test patterns for correlation
       image_patch = np.ones((16, 16))
@@ -40,6 +42,7 @@ def stft2d_test(window_size=32, corr_enabled=False, test_type=1, fig_num=2):
   border_mask[window_size+1:-window_size, window_size+1:-window_size] = 1
   indices               = np.nonzero(border_mask)
   error                 = np.std(image[indices] - reconstructed_image[indices])
+  print("Error:", error)
 
   # Visualize
   plt.figure(fig_num + 1)
@@ -53,7 +56,7 @@ def stft2d_test(window_size=32, corr_enabled=False, test_type=1, fig_num=2):
   plt.colorbar(orientation='horizontal')
 
   plt.show()
-  print("Error:", error)
+
 
 if __name__ == "__main__":
-  stft2d_test()
+  stft2d_test(window_size=16, corr_enabled=False, test_type=3)

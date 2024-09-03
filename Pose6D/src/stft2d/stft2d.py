@@ -28,10 +28,12 @@ def stft2d(Im, window_size=16, corr_enabled=False):
   if window_size % 2 != 0:
     raise ValueError("Window size must be even")
 
+  if len(Im.shape) > 2:
+    raise ValueError("Image must be 2D array")
+
   # Convert image to double and grayscale if necessary
   Im = Im.astype(np.float64)
-  if len(Im.shape) == 3:
-    Im = cv.cvtColor(Im, cv.COLOR_RGB2GRAY)
+
 
   # Get image dimensions and number of color channels
   n_rows, n_cols = Im.shape
@@ -56,11 +58,16 @@ def stft2d(Im, window_size=16, corr_enabled=False):
 
   # Construct frequency mask for correlation adjustment (if enabled)
   dc_mask     = np.ones((window_size, window_size))
-  if corr_enabled:
-    center_idx = window_size // 2
-    dc_mask[center_idx:center_idx+3, center_idx:center_idx+3] = 0
+  if corr_enabled :
+    #center_idx = window_size // 2
+    #dc_mask[center_idx-1:center_idx+1, center_idx-1:center_idx+1] = 0
+    dc_mask[0,0]             = 0
+    #dc_mask[window_size-1,0] = 0
+    #dc_mask[0,window_size-1] = 0
+    #dc_mask[window_size-1,window_size-1] = 0
+    #pass
 
-  frequency_mask  = fftshift(dc_mask) # np.tile(fftshift(dc_mask), (row_win_num, col_win_num))
+  frequency_mask      = dc_mask #fftshift(dc_mask) # np.tile(fftshift(dc_mask), (row_win_num, col_win_num))
 
   # Initialize STFT output
   stft        = np.zeros((n_rows, n_cols, 4), dtype=np.complex64)

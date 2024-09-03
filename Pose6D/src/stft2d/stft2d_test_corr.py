@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2 as cv
+from stft2d import stft2d
+from istft2d import istft2d
 
 def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
   """
@@ -14,19 +17,20 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
 
   # Select test case
   if test_type == 1:  # Test random image
-      image1 = np.random.randn(128, 128) * 60 + 120
-      shift = np.array([2, 2]) * 2
+      image1 = np.random.randn(128, 128) * 60 + 60
+      shift = np.array([2, 2]) * 1
       image2 = np.roll(image1, shift, axis=(0, 1))
   elif test_type == 2:  # Test simple image
       # Assuming 'trees' is a predefined image
-      image1 = np.array(trees)
+      image = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_1004.png")
+      image1 = cv.cvtColor(image, cv.COLOR_RGB2GRAY)      
       shift = np.array([2, 2]) * 2
       image2 = np.roll(image1, shift, axis=(0, 1))
   elif test_type == 3:  # Small size
       image1 = np.zeros((64, 64))
       image1[4 * window_size // 2 : 4 * window_size // 2 + window_size,
              4 * window_size // 2 : 4 * window_size // 2 + window_size] = 100
-      shift = np.array([2, 2]) * 0
+      shift = np.array([2, 2]) * 1
       image2 = np.roll(image1, shift, axis=(0, 1))
   elif test_type == 4:  # Small size
       image1 = np.random.rand(40, 40)
@@ -48,6 +52,13 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
       image1 = image * 128 + 10 + np.random.randn(*image.shape) * 8
       shift = np.array([2, 2]) * 1
       image2 = np.roll(image1, shift, axis=(0, 1))
+  elif test_type == 12:  # Test pattern against image
+      image1    = np.random.randn(128, 128) * 60 + 50
+      offset    = 36
+      image_patch = image1[offset:offset+window_size,offset:offset+window_size]
+      image2    = np.tile(image_patch, (8, 8))
+      shift     = np.array([2, 2]) * 0
+      image1    = np.roll(image1, shift, axis=(0, 1))      
   else:
       raise ValueError("Unknown TestType")
 
@@ -65,9 +76,11 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
 
   # Visualize correlation
   plt.figure(fig_num)
-  plt.imshow(np.log10(np.abs(correlation_image)), cmap='gray')
+  #plt.imshow(np.log10(np.abs(correlation_image)), cmap='gray')
+  plt.imshow(np.abs(correlation_image), cmap='gray')
   plt.title(f"Correlation Shift: {shift}")
   plt.colorbar(orientation='horizontal')
+  plt.show()
 
 if __name__ == "__main__":
-  stft2d_test_corr()
+  stft2d_test_corr(window_size=16, corr_enabled=True, test_type=12)
