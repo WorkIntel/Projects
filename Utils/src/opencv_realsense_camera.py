@@ -33,7 +33,7 @@ import cv2 as cv
 class RealSense(object):
     def __init__(self,  mode = 'rgb', use_ir = True, **params):
         
-        self.frame_size = (1280, 720)#(640,480) #
+        self.frame_size = (640,480) #(1280, 720)#
         self.count      = 0
         self.mode       = 'rgb' if mode is None else mode 
         self.use_ir     = False if use_ir is None else use_ir
