@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 from stft2d import stft2d
 from istft2d import istft2d
+from block_processing import max_location
+
 
 def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
   """
@@ -52,13 +54,20 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
       image1 = image * 128 + 10 + np.random.randn(*image.shape) * 8
       shift = np.array([2, 2]) * 1
       image2 = np.roll(image1, shift, axis=(0, 1))
-  elif test_type == 12:  # Test pattern against image
-      image1    = np.random.randn(128, 128) * 60 + 50
-      offset    = 36
+  elif test_type == 12:  # Test pattern against image - in sync
+      image1    = np.random.randn(128, 128) * 60 + 0
+      offset    = 32
       image_patch = image1[offset:offset+window_size,offset:offset+window_size]
       image2    = np.tile(image_patch, (8, 8))
       shift     = np.array([2, 2]) * 0
-      image1    = np.roll(image1, shift, axis=(0, 1))      
+      image1    = np.roll(image1, shift, axis=(0, 1))  
+  elif test_type == 13:  # Test pattern against image - half win shift
+      image1    = np.random.randn(128, 128) * 60 + 0
+      offset    = 40
+      image_patch = image1[offset:offset+window_size,offset:offset+window_size]
+      image2    = np.tile(image_patch, (8, 8))
+      shift     = np.array([2, 2]) * 0
+      image1    = np.roll(image1, shift, axis=(0, 1))           
   else:
       raise ValueError("Unknown TestType")
 
@@ -67,20 +76,26 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
     raise ValueError("Images must be of the same size")
 
   # Perform STFT
-  image1_stft = stft2d(image1, window_size, corr_enabled)
-  image2_stft = stft2d(image2, window_size, corr_enabled)
+  image1_stft       = stft2d(image1, window_size, corr_enabled)
+  image2_stft       = stft2d(image2, window_size, corr_enabled)
 
   # Correlate and perform ISTFT
-  correlation_stft = image1_stft * np.conj(image2_stft)
+  correlation_stft  = image1_stft * np.conj(image2_stft)
   correlation_image = istft2d(correlation_stft, window_size, corr_enabled)
+  
+  peak_xy           = max_location(np.abs(correlation_image))
+  peak_val          = np.abs(correlation_image.max())
+  txts              = 'Max val : %s, position : %s' %(str(peak_val), str(peak_xy))
+  print(txts)
 
   # Visualize correlation
   plt.figure(fig_num)
   #plt.imshow(np.log10(np.abs(correlation_image)), cmap='gray')
   plt.imshow(np.abs(correlation_image), cmap='gray')
-  plt.title(f"Correlation Shift: {shift}")
-  plt.colorbar(orientation='horizontal')
+  #plt.title(f"Correlation Shift: {shift}")
+  plt.title(txts)
+  plt.colorbar() #orientation='horizontal')
   plt.show()
 
 if __name__ == "__main__":
-  stft2d_test_corr(window_size=16, corr_enabled=True, test_type=12)
+  stft2d_test_corr(window_size=16, corr_enabled=True, test_type=13)

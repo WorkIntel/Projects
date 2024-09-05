@@ -1,6 +1,12 @@
 import numpy as np
 from scipy.fftpack import fft2, ifft2
 
+from numpy import unravel_index
+
+def max_location(a):
+    "position in 2d array"
+    return unravel_index(a.argmax(), a.shape)
+
 def multiply(a, b):
   """
   multiplies two arrays.
@@ -49,11 +55,11 @@ def block_process(big_array: np.array, small_array: np.array, fun):
 if __name__ == "__main__":
   "testing block processing"
 
-  a = np.arange(24*32).reshape(32,24) #np.ones([32, 24])
-  b = np.zeros([8, 8])+2
-  a1 = a.reshape(4, 8, 3, 8).transpose(0, 2, 1, 3)
-  res = a1 + b
-  res1 = res.transpose(0, 2, 1, 3).reshape(a.shape)
+  a     = np.arange(24*32).reshape(32,24) #np.ones([32, 24])
+  b     = np.zeros([8, 8])+2
+  a1    = a.reshape(4, 8, 3, 8).transpose(0, 2, 1, 3)
+  res   = a1 + b
+  res1  = res.transpose(0, 2, 1, 3).reshape(a.shape)
 
   print(a1.shape)
   print(res.shape)
@@ -64,3 +70,9 @@ if __name__ == "__main__":
   
   res2 = block_process(a,b, plus)
   print(np.all(res2 == (a+2)))
+
+  c     = np.ones([8, 8])
+  a3    = block_process(a,c, fft_multiply)
+  res3  = block_process(a3,c, ifft_multiply)
+  res3  = np.real(res3)
+  print(np.all(np.isclose(res3 , a)))

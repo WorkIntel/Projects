@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal.windows import triang
 #from scipy.fftpack import ifft2
-from block_processing import block_process, ifft_multiply
+from block_processing import block_process, multiply, ifft_multiply, max_location
 
 def istft2d(ImF, window_size=16, corr_enabled=False):
   """
@@ -52,6 +54,9 @@ def istft2d(ImF, window_size=16, corr_enabled=False):
   # freq mask
   freq_mask     = np.ones((window_size,window_size))
 
+  # Construct window mask
+  window_mask   = np.ones((window_size,window_size)) #np.outer(triang(window_size), triang(window_size))
+
   # Define translations
   translations = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
 
@@ -62,14 +67,12 @@ def istft2d(ImF, window_size=16, corr_enabled=False):
 
   # Loop through translations and perform inverse STFT
   for i, translation in enumerate(translations):
-    #row_indices = np.arange(active_rows) + translation[0]
-    #col_indices = np.arange(active_cols) + translation[1]
 
-    fft_patch   = ImF[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols, i]
+    fft_patch       = ImF[0:active_rows, 0:active_cols, i]
 
     # Apply inverse FFT
-    #image_patch = ifft2(fft_patch)
-    image_patch = block_process(fft_patch, freq_mask, ifft_multiply)
+    image_patch       = block_process(fft_patch, freq_mask, ifft_multiply)
+    image_patch       = block_process(image_patch, window_mask, multiply)
 
     # # Handle correlation adjustment if enabled
     # if corr_enabled:
@@ -77,6 +80,14 @@ def istft2d(ImF, window_size=16, corr_enabled=False):
 
     # Overlap-add reconstructed patches
     image[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols] += image_patch
+
+    # debug
+    peak_xy    = max_location(np.abs(image_patch))
+    plt.figure(20 + i)
+    plt.imshow(np.abs(image_patch), cmap='gray')
+    plt.title('Corr %s peak at %s' %(str(i),str(peak_xy)))
+    plt.colorbar() #orientation='horizontal')
+    plt.show()
 
   # Handle real output if correlation adjustment was not used
   if not corr_enabled:

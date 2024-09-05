@@ -32,7 +32,7 @@ def stft2d(Im, window_size=16, corr_enabled=False):
     raise ValueError("Image must be 2D array")
 
   # Convert image to double and grayscale if necessary
-  Im = Im.astype(np.float64)
+  Im            = Im.astype(np.float64)
 
 
   # Get image dimensions and number of color channels
@@ -70,10 +70,10 @@ def stft2d(Im, window_size=16, corr_enabled=False):
   frequency_mask      = dc_mask #fftshift(dc_mask) # np.tile(fftshift(dc_mask), (row_win_num, col_win_num))
 
   # Initialize STFT output
-  stft        = np.zeros((n_rows, n_cols, 4), dtype=np.complex64)
+  stft              = np.zeros((n_rows, n_cols, 4), dtype=np.complex64)
 
   # Define translations
-  translations = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
+  translations      = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
 
   # Loop through translations and perform STFT
   for i, translation in enumerate(translations):
@@ -85,7 +85,8 @@ def stft2d(Im, window_size=16, corr_enabled=False):
     image_patch   = block_process(image_patch, window_mask, multiply)
     fft_patch     = block_process(image_patch, frequency_mask, fft_multiply)
 
-    stft[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols, i] = fft_patch
+    #stft[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols, i] = fft_patch
+    stft[0:active_rows, 0:active_cols, i] = fft_patch
 
   return stft
 

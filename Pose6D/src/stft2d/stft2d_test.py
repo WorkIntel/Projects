@@ -48,12 +48,12 @@ def stft2d_test(window_size=32, corr_enabled=False, test_type=1, fig_num=2):
   plt.figure(fig_num + 1)
   plt.imshow(image, cmap='gray')
   plt.title("Original Image")
-  plt.colorbar(orientation='horizontal')
+  plt.colorbar() #orientation='horizontal')
 
   plt.figure(fig_num + 2)
   plt.imshow(reconstructed_image, cmap='gray')
   plt.title("Reconstructed Image")
-  plt.colorbar(orientation='horizontal')
+  plt.colorbar() #orientation='horizontal')
 
   plt.show()
 
