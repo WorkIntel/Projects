@@ -2,6 +2,22 @@
 
 '''
 This module contains some common routines used by other samples.
+
+Extending from OpenCV
+
+Environment : 
+
+Installation:
+
+Usage:
+
+-----------------------------
+ Ver    Date     Who    Descr
+-----------------------------
+0102   08.09.24 UD     Created.
+
+-----------------------------
+
 '''
 
 # Python 2/3 compatibility
@@ -235,3 +251,22 @@ def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
     for kp in keypoints:
         x, y = kp.pt
         cv.circle(vis, (int(x), int(y)), 2, color)
+
+
+# -------------------
+#%% Logger
+import logging
+log         = logging.getLogger("robot")
+#formatter   = logging.Formatter('[%(asctime)s.%(msecs)03d] {%(filename)6s:%(lineno)3d} %(levelname)s - %(message)s', datefmt="%M:%S", style="{")
+formatter   = logging.Formatter('[%(asctime)s] - [%(filename)12s:%(lineno)3d] - %(levelname)s - %(message)s')
+log.setLevel("DEBUG")
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel("DEBUG")
+console_handler.setFormatter(formatter)
+log.addHandler(console_handler)
+
+# file_handler = logging.FileHandler("main_app.log", mode="a", encoding="utf-8")
+# file_handler.setLevel("WARNING")
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)

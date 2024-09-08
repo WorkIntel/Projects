@@ -28,7 +28,7 @@ def ifft_multiply(a, b):
   c = ifft2(a) * b
   return c
 
-def block_process(big_array: np.array, small_array: np.array, fun):
+def block_process_slow(big_array: np.array, small_array: np.array, fun):
   """ 
   Prforms block processing of the big array using small arrray and function provided
   Similar to Matlab block processing function
@@ -54,7 +54,7 @@ def block_process(big_array: np.array, small_array: np.array, fun):
   return res
 
 # Helper functions (assuming these are defined elsewhere)
-def block_process_fast(big_array: np.array, small_array: np.array, fun):
+def block_process(big_array: np.array, small_array: np.array, fun):
   """ 
   Prforms block processing of the big array using small arrray and function provided
   Similar to Matlab block processing function
