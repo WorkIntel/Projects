@@ -52,6 +52,9 @@ def stft2d(Im, window_size=16, corr_enabled=False):
   active_rows = row_win_num * window_size
   active_cols = col_win_num * window_size
 
+    # Define translations
+  translations      = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
+
   # Construct window mask
   window_mask = np.outer(triang(window_size), triang(window_size))
   #mask        = np.tile(window_mask, (row_win_num, col_win_num))
@@ -65,15 +68,12 @@ def stft2d(Im, window_size=16, corr_enabled=False):
     #dc_mask[window_size-1,0] = 0
     #dc_mask[0,window_size-1] = 0
     #dc_mask[window_size-1,window_size-1] = 0
-    #pass
+    translations      = translations * 0  # no offsets
 
   frequency_mask      = dc_mask #fftshift(dc_mask) # np.tile(fftshift(dc_mask), (row_win_num, col_win_num))
 
   # Initialize STFT output
   stft              = np.zeros((n_rows, n_cols, 4), dtype=np.complex64)
-
-  # Define translations
-  translations      = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
 
   # Loop through translations and perform STFT
   for i, translation in enumerate(translations):

@@ -59,4 +59,4 @@ def stft2d_test(window_size=32, corr_enabled=False, test_type=1, fig_num=2):
 
 
 if __name__ == "__main__":
-  stft2d_test(window_size=16, corr_enabled=False, test_type=3)
+  stft2d_test(window_size=16, corr_enabled=False, test_type=1)

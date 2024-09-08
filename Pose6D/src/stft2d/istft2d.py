@@ -60,9 +60,9 @@ def istft2d(ImF, window_size=16, corr_enabled=False):
   # Define translations
   translations = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
 
-  # For correlation
-  if corr_enabled:
-    translations = translations * 0  # no offsets
+  # # For correlation
+  # if corr_enabled:
+  #   translations = translations * 0  # no offsets
 
 
   # Loop through translations and perform inverse STFT
@@ -85,7 +85,7 @@ def istft2d(ImF, window_size=16, corr_enabled=False):
     peak_xy    = max_location(np.abs(image_patch))
     plt.figure(20 + i)
     plt.imshow(np.abs(image_patch), cmap='gray')
-    plt.title('Corr %s peak at %s' %(str(i),str(peak_xy)))
+    plt.title('Pose y-%s, x-%s peak at %s' %(str(translation[0]),str(translation[1]),str(peak_xy)))
     plt.colorbar() #orientation='horizontal')
     plt.show()
 

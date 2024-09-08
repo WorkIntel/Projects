@@ -67,7 +67,14 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
       image_patch = image1[offset:offset+window_size,offset:offset+window_size]
       image2    = np.tile(image_patch, (8, 8))
       shift     = np.array([2, 2]) * 0
-      image1    = np.roll(image1, shift, axis=(0, 1))           
+      image1    = np.roll(image1, shift, axis=(0, 1))   
+  elif test_type == 14:  # Test pattern against image - half win shift
+      image1    = np.random.randn(128, 128) * 60 + 0
+      offset    = [40,32]
+      image_patch = image1[offset[0]:offset[0]+window_size,offset[1]:offset[1]+window_size]
+      image2    = np.tile(image_patch, (8, 8))
+      shift     = np.array([2, 2]) * 0
+      image1    = np.roll(image1, shift, axis=(0, 1))                
   else:
       raise ValueError("Unknown TestType")
 
@@ -76,12 +83,12 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
     raise ValueError("Images must be of the same size")
 
   # Perform STFT
-  image1_stft       = stft2d(image1, window_size, corr_enabled)
+  image1_stft       = stft2d(image1, window_size) #, corr_enabled = False)
   image2_stft       = stft2d(image2, window_size, corr_enabled)
 
   # Correlate and perform ISTFT
   correlation_stft  = image1_stft * np.conj(image2_stft)
-  correlation_image = istft2d(correlation_stft, window_size, corr_enabled)
+  correlation_image = istft2d(correlation_stft, window_size) #, corr_enabled = False)
   
   peak_xy           = max_location(np.abs(correlation_image))
   peak_val          = np.abs(correlation_image.max())
@@ -98,4 +105,4 @@ def stft2d_test_corr(window_size=16, corr_enabled=True, test_type=6, fig_num=1):
   plt.show()
 
 if __name__ == "__main__":
-  stft2d_test_corr(window_size=16, corr_enabled=True, test_type=13)
+  stft2d_test_corr(window_size=16, corr_enabled=True, test_type=14)
