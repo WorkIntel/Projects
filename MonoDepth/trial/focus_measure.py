@@ -229,6 +229,30 @@ def lapm_focus_measure(image, wsize):
 
     return fm
 
+def udud_focus_measure(image, wsize):
+    """
+    Computes the modified Laplacian focus measure.
+
+    Args:
+        image: The input image as a numpy array.
+        wsize: The size of the neighborhood for focus measure calculation.
+
+    Returns:
+        The computed focus measure as a numpy array.
+    """
+
+    M = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]) #np.array([-1, 2, -1])
+    Lx = convolve2d(image, M, mode='same', boundary = 'wrap')
+    Ly = convolve2d(image, M.T, mode='same',  boundary = 'wrap')
+    FM = np.abs(Lx) + np.abs(Ly)
+
+    if wsize == 0:
+        fm = np.max(FM)
+    else:
+        fm = generic_filter(FM, np.amax, size=(wsize, wsize))
+
+    return fm
+
 def tengthird_focus_measure(image, wsize):
     """
     Computes the Tenengrad focus measure.
@@ -293,6 +317,9 @@ def focus_measure(image, measure, wsize):
 
     elif measure.upper() == 'LAPM' : # Modified Laplacian (Nayar89)
         fm = lapm_focus_measure(image, wsize)  
+
+    elif measure.upper() == 'UDUD': # % UD - max of the laplacian 
+        fm = udud_focus_measure(image, wsize)        
 
     elif measure.upper() == 'TENG' : # Tenengrad (Krotkov86)
         fm = tengthird_focus_measure(image, wsize)  

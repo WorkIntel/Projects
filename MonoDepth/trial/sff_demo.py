@@ -55,7 +55,6 @@ import numpy as np
 from sff import compute_sff
 
 # -------------------------
-
 def load_matdata(fpath):
     mat_contents = sio.loadmat(fpath)
     print(type(mat_contents))
@@ -63,8 +62,6 @@ def load_matdata(fpath):
     img_stack = mat_contents['imdata'][0][0]
 
     return img_stack
-
-# -------------------------
 
 def read_images(imlist, opts):
     """
@@ -168,16 +165,17 @@ def display_depthmap(z, zc):
 
     plt.show()
 
+# -------------------------
 def main():
     "main algo"
 
     opts = {
     #     'RGB': len(im.shape) == 3,
          'interp': True,
-         'fmeasure': 'LAPM',
-    #     'filter': args.filter,
-         'nhsize': 15,
-         'focus': list(range(1, 15 + 1))
+         'fmeasure': 'UDUD', #'LAPM',
+         'filter': 0,
+         'nhsize': 5,
+         'focus': list(range(1, 30 + 1))
     #     'ROI': args.roi,
     #     'size': (im.shape[0], im.shape[1], len(imlist))
     }    
@@ -190,12 +188,8 @@ def main():
 
     #  [z, r] = sff(imdata.images, 'focus', imdata.focus)
     z, r        = compute_sff(images, opts)
-
-    zc, r       = carve_depthmap(z, r, threshold=20)
-
+    zc          = carve_depthmap(z, r, threshold=20)
     display_depthmap(z, zc)
    
-
-
 if __name__ == '__main__':
     main()

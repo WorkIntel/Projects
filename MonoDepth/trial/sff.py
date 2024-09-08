@@ -85,8 +85,8 @@ import cv2
 import argparse
 from scipy.signal import convolve2d #, median_filter
 from focus_measure import focus_measure
-# -------------------------
 
+# -------------------------
 def read_images(imlist, opts):
     """
     Reads images from a list of file paths, performs cropping and grayscale conversion if necessary.
@@ -120,6 +120,119 @@ def read_images(imlist, opts):
 
     print()
     return images
+
+# -------------------------
+def parse_inputs(imlist, **kwargs):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--filter',     type=int, default=0, help='Size of median filter')
+    parser.add_argument('--fmeasure',   type=str, default='glvm', help='Focus measure operator')
+    parser.add_argument('--focus',      type=float, nargs='+', default=None, help='Focus positions')
+    parser.add_argument('--interp',     type=bool, default=True, help='Enable Gaussian interpolation')
+    parser.add_argument('--nhsize',     type=int, default=9, help='Size of focus measure window')
+    parser.add_argument('--roi',        type=int, nargs=4, default=None, help='Region of interest')
+
+    args = parser.parse_args(args=[])  # Parse empty args to use kwargs
+
+    # Convert kwargs to argparse namespace
+    for key, value in kwargs.items():
+        if hasattr(args, key):
+            setattr(args, key, value)
+
+    # Determine image size
+    import cv2
+    im = cv2.imread(imlist[0])
+    if im is None:
+        raise ValueError("Failed to read image")
+    
+    opts = {
+        'RGB': len(im.shape) == 3,
+        'interp': args.interp,
+        'fmeasure': args.fmeasure,
+        'filter': args.filter,
+        'nhsize': args.nhsize,
+        'focus': args.focus if args.focus else list(range(1, len(imlist) + 1)),
+        'ROI': args.roi,
+        'size': (im.shape[0], im.shape[1], len(imlist))
+    }
+
+    return opts
+
+# -------------------------
+def gauss3P(x, Y):
+    """
+    Closed-form solution for Gaussian interpolation using 3 points
+
+    Args:
+        x: Independent variable data.
+        Y: Dependent variable data.
+
+    Returns:
+        I: Index of the maximum value in each column of Y.
+        u: Mean of the Gaussian distribution.
+        s: Standard deviation of the Gaussian distribution.
+        A: Amplitude of the Gaussian distribution.
+    """
+
+    STEP = 2
+    M, N, P = Y.shape
+    I = np.argmax(Y, axis=2)
+    I = np.clip(I, STEP, P - STEP - 1)  # Clip indices to avoid out-of-bounds
+
+    IN, IM = np.meshgrid(np.arange(N), np.arange(M))
+    Ic     = I.flatten()
+    Index1 = IM.flatten() * P * N + IN.flatten() * P + Ic - STEP
+    Index2 = IM.flatten() * P * N + IN.flatten() * P + Ic
+    Index3 = IM.flatten() * P * N + IN.flatten() * P + Ic + STEP
+
+    x1 = x[Ic - STEP].reshape(M, N)
+    x2 = x[Ic].reshape(M, N)
+    x3 = x[Ic + STEP].reshape(M, N)
+    y1 = np.log(Y.flat[Index1]).reshape(M, N)
+    y2 = np.log(Y.flat[Index2]).reshape(M, N)
+    y3 = np.log(Y.flat[Index3]).reshape(M, N)
+
+    # original
+    # c = ((y1 - y2) * (x2 - x3) - (y2 - y3) * (x1 - x2)) / ((x1**2 - x2**2) * (x2 - x3) - (x2**2 - x3**2) * (x1 - x2))
+    # b = ((y2 - y3) - c * (x2 - x3) * (x2 + x3)) / (x2 - x3)
+    # a = y1 - b * x1 - c * x1**2
+
+    # s = np.sqrt(-1 / (2 * c))
+    # u = b * s**2
+    # A = np.exp(a + u**2 / (2 * s**2))
+
+    # lecture 
+    d = 2*(x3-x2)*(2*y2 - y1 - y3)
+    n = (y2 - y3)*(x2**2 - x1**2) - (y2 - y1)*(x2**2 - x3**2)
+    u = n/d   # gauss mean
+    s = 1
+    A = 1
+
+    return I, u, s, A
+
+# -------------------------
+def rmeasure(opts, images, fm, fmax, A, zi, s):
+
+    M, N, P = images.shape
+    start_time = time.time()
+    print("Rmeasure")
+    err = np.zeros((M, N))
+
+    # Compute fitting error
+    for p in range(P):
+        err += np.abs(fm[:, :, p] - A * np.exp(-((opts['focus'][p] - zi) ** 2) / (2 * s**2)))
+        print(f"\rRmeasure [{(p+1):02d}/{P:02d}]", end="")
+    print()
+
+    h       = np.ones((opts['nhsize'], opts['nhsize'])) / (opts['nhsize'] * opts['nhsize'])  # Equivalent to fspecial('average')
+    err     = convolve2d(err, h, mode='same')
+
+    R       = 20 * np.log10(P * fmax / err)
+    mask    = np.isnan(zi)
+    R[mask | (R < 0) | np.isnan(R)] = 0
+    print()
+    end_time = time.time()
+    print(f"Rmeasure time: {end_time - start_time:.2f} s")
+    return R
 
 
 # -------------------------
@@ -164,121 +277,18 @@ def compute_sff(images, opts):
     #     I = np.argmax(fm, axis=2)
     #     z = opts['focus'][I]
 
-    fmax = opts['focus'][I]
-    z[np.isnan(z)] = fmax[np.isnan(z)]
-    end_time = time.time()
+    fmax            = opts['focus'][I]
+    z[np.isnan(z)]  = fmax[np.isnan(z)]
+    end_time        = time.time()
     print(f"Depthmap time: {end_time - start_time:.2f} s")
 
-    # Median filter
-    if opts['filter'] != 0:
-        print("Smoothing")
-        z = median_filter(z, size=(opts['filter'], opts['filter']))
-        print("[100%]")
+    # # Median filter
+    # if opts['filter'] != 0:
+    #     print("Smoothing")
+    #     z = median_filter(z, size=(opts['filter'], opts['filter']))
+    #     print("[100%]")
 
     # Reliability measure
+    R = rmeasure(opts, images, fm, fmax, A, zi, s)
 
-    start_time = time.time()
-    print("Rmeasure")
-    err = np.zeros((M, N))
-
-    # Compute fitting error
-    for p in range(P):
-        err += np.abs(fm[:, :, p] - A * np.exp(-((opts['focus'][p] - zi) ** 2) / (2 * s**2)))
-        print(f"\rRmeasure [{(p+1):02d}/{P:02d}]", end="")
-    print()
-
-    h = np.ones((opts['nhsize'], opts['nhsize'])) / (opts['nhsize'] * opts['nhsize'])  # Equivalent to fspecial('average')
-    err = convolve2d(err, h, mode='same')
-
-    R = 20 * np.log10(P * fmax / err)
-    mask = np.isnan(zi)
-    R[mask | (R < 0) | np.isnan(R)] = 0
-    print()
-    end_time = time.time()
-    print(f"Rmeasure time: {end_time - start_time:.2f} s")
     return z, R
-
-
-
-# -------------------------
-
-def parse_inputs(imlist, **kwargs):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--filter', type=int, default=0, help='Size of median filter')
-    parser.add_argument('--fmeasure', type=str, default='glvm', help='Focus measure operator')
-    parser.add_argument('--focus', type=float, nargs='+', default=None, help='Focus positions')
-    parser.add_argument('--interp', type=bool, default=True, help='Enable Gaussian interpolation')
-    parser.add_argument('--nhsize', type=int, default=9, help='Size of focus measure window')
-    parser.add_argument('--roi', type=int, nargs=4, default=None, help='Region of interest')
-
-    args = parser.parse_args(args=[])  # Parse empty args to use kwargs
-
-    # Convert kwargs to argparse namespace
-    for key, value in kwargs.items():
-        if hasattr(args, key):
-            setattr(args, key, value)
-
-    # Determine image size
-    import cv2
-    im = cv2.imread(imlist[0])
-    if im is None:
-        raise ValueError("Failed to read image")
-    
-    opts = {
-        'RGB': len(im.shape) == 3,
-        'interp': args.interp,
-        'fmeasure': args.fmeasure,
-        'filter': args.filter,
-        'nhsize': args.nhsize,
-        'focus': args.focus if args.focus else list(range(1, len(imlist) + 1)),
-        'ROI': args.roi,
-        'size': (im.shape[0], im.shape[1], len(imlist))
-    }
-
-    return opts
-
-
-# -------------------------
-def gauss3P(x, Y):
-    """
-    Closed-form solution for Gaussian interpolation using 3 points
-
-    Args:
-        x: Independent variable data.
-        Y: Dependent variable data.
-
-    Returns:
-        I: Index of the maximum value in each column of Y.
-        u: Mean of the Gaussian distribution.
-        s: Standard deviation of the Gaussian distribution.
-        A: Amplitude of the Gaussian distribution.
-    """
-
-    STEP = 2
-    M, N, P = Y.shape
-    I = np.argmax(Y, axis=2)
-    I = np.clip(I, STEP, P - STEP)  # Clip indices to avoid out-of-bounds
-
-    IN, IM = np.meshgrid(np.arange(N), np.arange(M))
-    Ic = I.flatten()
-    Index1 = IM.flatten() * P * N + IN.flatten() * P + Ic - STEP
-    Index2 = IM.flatten() * P * N + IN.flatten() * P + Ic
-    Index3 = IM.flatten() * P * N + IN.flatten() * P + Ic + STEP
-
-    x1 = x[Ic - STEP].reshape(M, N)
-    x2 = x[Ic].reshape(M, N)
-    x3 = x[Ic + STEP].reshape(M, N)
-    y1 = np.log(Y.flat[Index1]).reshape(M, N)
-    y2 = np.log(Y.flat[Index2]).reshape(M, N)
-    y3 = np.log(Y.flat[Index3]).reshape(M, N)
-
-    c = ((y1 - y2) * (x2 - x3) - (y2 - y3) * (x1 - x2)) / \
-        ((x1**2 - x2**2) * (x2 - x3) - (x2**2 - x3**2) * (x1 - x2))
-    b = ((y2 - y3) - c * (x2 - x3) * (x2 + x3)) / (x2 - x3)
-    a = y1 - b * x1 - c * x1**2
-
-    s = np.sqrt(-1 / (2 * c))
-    u = b * s**2
-    A = np.exp(a + u**2 / (2 * s**2))
-
-    return I, u, s, A
