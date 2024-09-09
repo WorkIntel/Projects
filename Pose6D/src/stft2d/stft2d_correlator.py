@@ -174,8 +174,13 @@ class DataGenerator:
             self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\r2_Infrared.png", cv.IMREAD_GRAYSCALE) )             
 
         elif img_type == 6: # same image with shift
-            self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE))
-            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE))
+            self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
+            self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
+            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+
+        elif img_type == 7: # same image with shift
+            self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
+            self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)[100:228, 100:228]
             self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
 
         # Select test case
@@ -184,6 +189,7 @@ class DataGenerator:
             shift       = np.array([2, 2]) * 1
             image2      = np.roll(image1, shift, axis=(0, 1))
             self.imgL, self.imgR = image1, image2
+
         elif img_type == 32:  # Test simple image
             # Assuming 'trees' is a predefined image
             image       = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_1004.png")
@@ -448,6 +454,7 @@ class STFT2D:
 
         # freq mask
         freq_mask     = np.ones((window_size,window_size))
+        #freq_mask[0,0]= 0
 
         # Construct window mask
         window_mask   = np.ones((window_size,window_size)) #np.outer(triang(window_size), triang(window_size))
@@ -455,9 +462,9 @@ class STFT2D:
         # Define translations
         translations = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
 
-        # # For correlation
-        # if corr_enabled:
-        #   translations = translations * 0  # no offsets
+        # For correlation
+        if corr_enabled:
+          translations = translations * 0  # no offsets
 
 
         # Loop through translations and perform inverse STFT
@@ -564,7 +571,7 @@ class STFT2D:
 
         # Correlate and perform ISTFT
         correlation_stft  = image1_stft * np.conj(image2_stft)
-        correlation_image = self.istft2d(correlation_stft, window_size) #, corr_enabled = False)
+        correlation_image = self.istft2d(correlation_stft, window_size, corr_enabled = True)
 
         return correlation_image
         
@@ -639,11 +646,11 @@ class TestSTFT2D(unittest.TestCase):
 
     def test_stft2d_two_real_images(self):
         "correlator of left and right images"
-        w_size  = 32
+        w_size  = 64
         p       = STFT2D()
         d       = DataGenerator()
         isOk    = d.init_image(img_type = 6, window_size = w_size)
-        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size)
+        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size, corr_enabled = False)
         d.show_images()
         p.show_corr_image(img_c)
         self.assertTrue(isOk)                
@@ -697,9 +704,9 @@ if __name__ == '__main__':
 
     #suite.addTest(TestSTFT2D("test_stft2d")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_corr")) # ok
-    #suite.addTest(TestSTFT2D("test_stft2d_corr_datagen")) # ok
+    suite.addTest(TestSTFT2D("test_stft2d_corr_datagen")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_two_images")) # ok
-    suite.addTest(TestSTFT2D("test_stft2d_two_real_images")) # 
+    #suite.addTest(TestSTFT2D("test_stft2d_two_real_images")) # 
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
