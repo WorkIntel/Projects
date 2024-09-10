@@ -117,7 +117,7 @@ class DepthEstimator:
         elif img_type == 21:  # Test one image against image 
             image1      = np.random.randn(480, 640) * 60 + 60
             image2      = image1.copy()
-            shift       = np.array([0, 15])*1
+            shift       = np.array([-2, 15])*1
             image2      = np.roll(image2, shift, axis=(0, 1))  
             self.imgL, self.imgR, self.imgD = np.uint8(image1), np.uint8(image2), np.uint8(image1)
 
@@ -125,7 +125,7 @@ class DepthEstimator:
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
             #self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE)    
-            self.imgR = np.roll(self.imgL, np.array([0, 15]), axis=(0, 1)) 
+            self.imgR = np.roll(self.imgL, np.array([2, 25]), axis=(0, 1)) 
 
         else:
             self.tprint('Incorrect image type to load')        
@@ -363,7 +363,7 @@ class DepthEstimator:
         best_r, best_c = np.unravel_index(search_result.argmin(), search_result.shape)
 
         # find secong minima
-        suppres_size   = 5
+        suppres_size   = 3
         r_min, r_max   = np.maximum(0,best_r-suppres_size),np.minimum(search_range_r,best_r+suppres_size)
         c_min, c_max   = np.maximum(0,best_c-suppres_size),np.minimum(search_range_c,best_c+suppres_size)
         best_v         = search_result[r_min:r_max,c_min:c_max].min()
@@ -372,6 +372,37 @@ class DepthEstimator:
         best_conf      = 1 - best_v/best_v2
 
         return  best_r, best_c, best_conf   
+
+    def flow_interpolation(self, mvx, mvy, mvc, interp_size):
+        "interpolation of the flow"
+                # # interpolate to the size of the original image
+        # x      = np.arange(0, mvx.shape[1]) * block_size
+        # y      = np.arange(0, mvx.shape[0]) * block_size
+        # #
+        # #data   = ff(xg, yg)
+        # xi      = np.arange(0, width)
+        # yi      = np.arange(0, height)  
+
+        # xg, yg  = np.meshgrid(xi, yi, indexing='ij')
+        # xg, yg  = xg.T.astype(np.float32), yg.T.astype(np.float32)
+
+        # test_points = np.array([xg.ravel(), yg.ravel()]).T
+        # interp = RegularGridInterpolator([y, x], mvx, bounds_error=False, fill_value=None)
+        # mvxi   = interp(test_points, method='linear').reshape((height,width))
+        # interp = RegularGridInterpolator([y, x], mvy, bounds_error=False, fill_value=None)
+        # mvyi   = interp(test_points, method='linear').reshape((height,width))
+        # interp = RegularGridInterpolator([y, x], mvc, bounds_error=False, fill_value=None)
+        # mvci   = interp(test_points, method='linear').reshape((height,width))
+
+        # mvxi    = cv.remap(mvx, xg, yg, cv.INTER_LINEAR)
+        # mvyi    = cv.remap(mvy, xg, yg, cv.INTER_LINEAR)
+        # mvci    = cv.remap(mvc, xg, yg, cv.INTER_LINEAR)
+
+        mvxi     = cv.resize(mvx, interp_size, interpolation = cv.INTER_CUBIC)
+        mvyi     = cv.resize(mvy, interp_size, interpolation = cv.INTER_CUBIC)
+        mvci     = cv.resize(mvc, interp_size, interpolation = cv.INTER_CUBIC)
+        flow    = np.stack((mvxi,mvyi,mvci),axis = 2)
+        return flow
 
     def block_matching_with_confidence(self, f1, f2, block_size=8, search_range=16):
         """
@@ -423,36 +454,70 @@ class DepthEstimator:
                 mvc[iblk, jblk] = best_v
                        
 
-        # # interpolate to the size of the original image
-        # x      = np.arange(0, mvx.shape[1]) * block_size
-        # y      = np.arange(0, mvx.shape[0]) * block_size
-        # #
-        # #data   = ff(xg, yg)
-        # xi      = np.arange(0, width)
-        # yi      = np.arange(0, height)  
 
-        # xg, yg  = np.meshgrid(xi, yi, indexing='ij')
-        # xg, yg  = xg.T.astype(np.float32), yg.T.astype(np.float32)
 
-        # test_points = np.array([xg.ravel(), yg.ravel()]).T
-        # interp = RegularGridInterpolator([y, x], mvx, bounds_error=False, fill_value=None)
-        # mvxi   = interp(test_points, method='linear').reshape((height,width))
-        # interp = RegularGridInterpolator([y, x], mvy, bounds_error=False, fill_value=None)
-        # mvyi   = interp(test_points, method='linear').reshape((height,width))
-        # interp = RegularGridInterpolator([y, x], mvc, bounds_error=False, fill_value=None)
-        # mvci   = interp(test_points, method='linear').reshape((height,width))
-
-        # mvxi    = cv.remap(mvx, xg, yg, cv.INTER_LINEAR)
-        # mvyi    = cv.remap(mvy, xg, yg, cv.INTER_LINEAR)
-        # mvci    = cv.remap(mvc, xg, yg, cv.INTER_LINEAR)
-
-        mvxi     = cv.resize(mvx, (width, height), interpolation = cv.INTER_CUBIC)
-        mvyi     = cv.resize(mvy, (width, height), interpolation = cv.INTER_CUBIC)
-        mvci     = cv.resize(mvc, (width, height), interpolation = cv.INTER_CUBIC)
-
-        flow    = np.stack((mvxi,mvyi,mvci),axis = 2)
+        # interpolation
+        flow = self.flow_interpolation(mvx, mvy, mvc, interp_size = (width, height))        
 
         return fp, flow      
+    
+    def block_matching_with_confidence_2d(self, f1, f2, block_size=8, search_range=16):
+        """
+        Performs block matching motion estimation also computes confidence and controls 2D search range.
+        Row range is 10% of the column range
+        Args:
+            f1: The anchor frame image.
+            f2: The target frame image.
+            block_size: The size of the blocks (default: 8).
+            search_range: The maximum displacement for the search window (default: 16).
+
+        Returns:
+            - fp:  The predicted image.
+            - mvx: The horizontal motion vector field.
+            - mvy: The vertical motion vector field.
+            - mvc: The confidence of the peak 
+        """
+
+        height, width   = f1.shape[:2]
+        fp              = np.zeros_like(f1)
+        mvx             = np.zeros((height // block_size, width // block_size))
+        mvy             = np.zeros((height // block_size, width // block_size))
+        mvc             = np.zeros((height // block_size, width // block_size)) # confidence
+
+        # up and down search
+        block_size_r    = block_size>>1
+        # search up and down
+        search_range_r  = int(search_range*0.1 + block_size_r)  #np.maximum(search_range>>1, block_size_r)
+        # only to the right
+        search_range_c  = np.maximum(search_range, block_size)
+
+        # rows can be negative and positive. columns only positive because of Left and Right stereo
+        for i in range(search_range_r, height - search_range_r + 1, block_size): # r
+            for j in range(0, width - search_range_c + 1, block_size): # c
+
+                match_block     = f1[i-block_size_r  :i + block_size_r,  j:j + block_size]
+                search_region   = f2[i-search_range_r:i + search_range_r,j:j + search_range_c]
+
+                best_r, best_c, best_v = self.block_match_in_search_region(match_block, search_region) 
+                block3          = search_region[best_r:best_r + block_size, best_c:best_c + block_size]
+                #best_r          = best_r - block_size_r # offset
+
+                #block3          = f2[i + best_r:i + best_r + block_size, j + best_c:j + best_c + block_size]
+                fp[i:i + block_size, j:j + block_size] = np.uint8(block3 >> 1) + np.uint8(fp[i:i + block_size, j:j + block_size] >> 1)
+                iblk            = i // block_size 
+                jblk            = j // block_size 
+                mvx[iblk, jblk] = best_c
+                mvy[iblk, jblk] = best_r
+                mvc[iblk, jblk] = best_v
+
+        # save time
+        mvy = mvy + block_size_r -search_range_r
+             
+
+        # interpolation
+        flow = self.flow_interpolation(mvx, mvy, mvc, interp_size = (width, height))
+
+        return fp, flow        
 
     # -----------------------------------------
     def show_images_left_right(self):
@@ -532,11 +597,7 @@ class DepthEstimator:
         ch = cv.waitKey(1)
         ret = ch == ord('q')          
 
-
-
-
         return ret
-
 
     def tprint(self, txt = '', level = 'I'):
         if level == "I":
@@ -548,7 +609,6 @@ class DepthEstimator:
         else:
             log.info(txt)
   
-
 
 # ----------------------
 #%% Tests
@@ -635,12 +695,22 @@ class TestDepthEstimator(unittest.TestCase):
     def test_block_matching_with_confidence(self):
         "depth from block matching - bruit force with confidence"
         p           = DepthEstimator()
-        isOk        = p.init_image(4)
+        isOk        = p.init_image(22)
         isOk        = p.show_images_left_right()
         img, flow   = p.block_matching_with_confidence(p.imgL, p.imgR, block_size=16, search_range=32)
         isOk        = p.show_flow(img, flow, step=16)
         ch          = cv.waitKey()
         self.assertTrue(isOk)   
+
+    def test_block_matching_with_confidence_2d(self):
+        "depth from block matching - bruit force with confidence - search in 2D"
+        p           = DepthEstimator()
+        isOk        = p.init_image(4)  # 21,22 - ok
+        isOk        = p.show_images_left_right()
+        img, flow   = p.block_matching_with_confidence_2d(p.imgL, p.imgR, block_size=24, search_range=56)
+        isOk        = p.show_flow(img, flow, step=16)
+        ch          = cv.waitKey()
+        self.assertTrue(isOk)           
 
 
 
@@ -697,8 +767,8 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
     #suite.addTest(TestDepthEstimator("test_show_flow"))
     #suite.addTest(TestDepthEstimator("test_block_matching"))
-    suite.addTest(TestDepthEstimator("test_block_matching_with_confidence"))
-
+    #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence"))
+    suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
     runner = unittest.TextTestRunner()
     runner.run(suite)
 
