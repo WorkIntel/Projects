@@ -282,8 +282,8 @@ class DepthEstimator:
                 mvy[iblk - 1, jblk - 1] = best_r
 
         # interpolate to the size of the original image
-        x      = np.arange(0, width, block_size)
-        y      = np.arange(0, height, block_size)
+        x      = np.arange(0, mvx.shape[1]) * block_size
+        y      = np.arange(0, mvx.shape[0]) * block_size
         #
         #data   = ff(xg, yg)
         xi      = np.arange(0, width)
@@ -515,10 +515,10 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
+    #suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
     #suite.addTest(TestDepthEstimator("test_show_flow"))
-    #suite.addTest(TestDepthEstimator("test_block_matching"))
+    suite.addTest(TestDepthEstimator("test_block_matching"))
 
     runner = unittest.TextTestRunner()
     runner.run(suite)

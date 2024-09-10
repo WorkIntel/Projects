@@ -183,6 +183,49 @@ class DataGenerator:
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)[100:228, 100:228]
             self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
 
+        elif img_type == 11:  # Test patterns for correlation
+            image_patch = np.ones((16, 16))
+            image_patch[4:13, 4:13] = 0
+            image       = np.tile(image_patch, (8, 8))
+            image1      = image * 128 + 10 + np.random.randn(*image.shape) * 8
+            shift       = np.array([2, 2]) * 1
+            image2      = np.roll(image1, shift, axis=(0, 1))
+            self.imgL, self.imgR = image1, image2
+
+        elif img_type == 12:  # Test pattern against image - in sync
+            image1      = np.random.randn(128, 128) * 60 + 0
+            offset      = 32
+            image_patch = image1[offset:offset+window_size,offset:offset+window_size]
+            image2      = np.tile(image_patch, (8, 8))
+            shift       = np.array([2, 2]) * 0
+            image1      = np.roll(image1, shift, axis=(0, 1))  
+            self.imgL, self.imgR = image1, image2
+
+        elif img_type == 13:  # Test pattern against image - half win shift
+            image1      = np.random.randn(128, 128) * 60 + 0
+            offset      = 40
+            image_patch = image1[offset:offset+window_size,offset:offset+window_size]
+            image2      = np.tile(image_patch, (8, 8))
+            shift       = np.array([2, 2]) * 0
+            image1      = np.roll(image1, shift, axis=(0, 1))   
+            self.imgL, self.imgR = image1, image2
+
+        elif img_type == 14:  # Test pattern against image - half win shift
+            image1      = np.random.randn(128, 128) * 60 + 0
+            offset      = [40,32]
+            image_patch = image1[offset[0]:offset[0]+window_size,offset[1]:offset[1]+window_size]
+            image2      = np.tile(image_patch, (8, 8))
+            shift       = np.array([2, 2]) * 0
+            image1      = np.roll(image1, shift, axis=(0, 1))  
+            self.imgL, self.imgR = image1, image2          
+
+        elif img_type == 21:  # Test one image against image 
+            image1      = np.random.randn(128, 128) * 60 + 60
+            image2      = image1.copy()
+            shift       = np.array([5, -2])*1
+            image1      = np.roll(image1, shift, axis=(0, 1))  
+            self.imgL, self.imgR = image1, image2   
+
         # Select test case
         elif img_type == 31:  # Test random image
             image1      = np.random.randn(128, 128) * 60 + 60
@@ -197,6 +240,7 @@ class DataGenerator:
             shift       = np.array([2, 2]) * 2
             image2      = np.roll(image1, shift, axis=(0, 1))
             self.imgL, self.imgR = image1, image2
+
         elif img_type == 33:  # Small size
             image1      = np.zeros((64, 64))
             image1[4 * window_size // 2 : 4 * window_size // 2 + window_size,
@@ -204,54 +248,19 @@ class DataGenerator:
             shift       = np.array([2, 2]) * 1
             image2      = np.roll(image1, shift, axis=(0, 1))
             self.imgL, self.imgR = image1, image2
+
         elif img_type == 34:  # Small size
             image1      = np.random.rand(40, 40)
             shift       = np.array([2, 2]) * 1
             image2      = np.roll(image1, shift, axis=(0, 1))
+
         elif img_type == 35:  # Test different size
             image1      = np.zeros((123, 171)) * 3
             image1[50:58, 50:58] = 180
             shift       = np.array([2, 2]) * 1
             image2      = np.roll(image1, shift, axis=(0, 1))
-            self.imgL, self.imgR = image1, image2
-        elif img_type == 11:  # Test patterns for correlation
-            image_patch = np.ones((16, 16))
-            image_patch[4:13, 4:13] = 0
-            image       = np.tile(image_patch, (8, 8))
-            image1      = image * 128 + 10 + np.random.randn(*image.shape) * 8
-            shift       = np.array([2, 2]) * 1
-            image2      = np.roll(image1, shift, axis=(0, 1))
-            self.imgL, self.imgR = image1, image2
-        elif img_type == 12:  # Test pattern against image - in sync
-            image1      = np.random.randn(128, 128) * 60 + 0
-            offset      = 32
-            image_patch = image1[offset:offset+window_size,offset:offset+window_size]
-            image2      = np.tile(image_patch, (8, 8))
-            shift       = np.array([2, 2]) * 0
-            image1      = np.roll(image1, shift, axis=(0, 1))  
-            self.imgL, self.imgR = image1, image2
-        elif img_type == 13:  # Test pattern against image - half win shift
-            image1      = np.random.randn(128, 128) * 60 + 0
-            offset      = 40
-            image_patch = image1[offset:offset+window_size,offset:offset+window_size]
-            image2      = np.tile(image_patch, (8, 8))
-            shift       = np.array([2, 2]) * 0
-            image1      = np.roll(image1, shift, axis=(0, 1))   
-            self.imgL, self.imgR = image1, image2
-        elif img_type == 14:  # Test pattern against image - half win shift
-            image1      = np.random.randn(128, 128) * 60 + 0
-            offset      = [40,32]
-            image_patch = image1[offset[0]:offset[0]+window_size,offset[1]:offset[1]+window_size]
-            image2      = np.tile(image_patch, (8, 8))
-            shift       = np.array([2, 2]) * 0
-            image1      = np.roll(image1, shift, axis=(0, 1))  
-            self.imgL, self.imgR = image1, image2           
-        elif img_type == 21:  # Test one image against image 
-            image1      = np.random.randn(128, 128) * 60 + 60
-            image2      = image1.copy()
-            shift       = np.array([5, -2])*1
-            image1      = np.roll(image1, shift, axis=(0, 1))  
-            self.imgL, self.imgR = image1, image2                   
+            self.imgL, self.imgR = image1, image2            
+
         else:
             raise ValueError("Unknown TestType")    
                       
@@ -571,7 +580,7 @@ class STFT2D:
 
         # Correlate and perform ISTFT
         correlation_stft  = image1_stft * np.conj(image2_stft)
-        correlation_image = self.istft2d(correlation_stft, window_size, corr_enabled = True)
+        correlation_image = self.istft2d(correlation_stft, window_size) #, corr_enabled = True)
 
         return correlation_image
         
@@ -620,9 +629,10 @@ class TestSTFT2D(unittest.TestCase):
         w_size  = 16
         p       = STFT2D()
         d       = DataGenerator()
-        d.init_image(img_type = 12, window_size = w_size)
-        p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size)
-        self.assertFalse(p.frame_size is None)          
+        isOk    = d.init_image(img_type = 12, window_size = w_size)
+        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size)
+        p.show_corr_image(img_c)
+        self.assertTrue(isOk)          
 
     def test_stft2d_corr_datagen(self):
         "correlator and data gen"

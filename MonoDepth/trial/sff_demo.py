@@ -254,7 +254,6 @@ def main_razy():
 
     opts['focus'] = focus
 
-    #  [z, r] = sff(imdata.images, 'focus', imdata.focus)
     z, r        = compute_sff(images, opts)
     zc          = carve_depthmap(z, r, threshold=20)
     display_depthmap(z, zc)    
