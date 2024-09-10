@@ -89,7 +89,12 @@ class DepthEstimator:
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
             self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE)  
 
-        elif img_type == 4:
+        elif img_type == 4: # L-R switched
+            self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
+            self.imgL = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE)
+            self.imgR = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)            
+
+        elif img_type == 6:
             self.imgD = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_029.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_031.png", cv.IMREAD_GRAYSCALE)
             self.imgR = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE)              
@@ -102,20 +107,25 @@ class DepthEstimator:
         elif img_type == 13:
             self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE))
             self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE))
-            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE) )             
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE) )   
+
+        elif img_type == 14:
+            self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE))
+            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE))
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE) )                       
 
         elif img_type == 21:  # Test one image against image 
-            image1      = np.random.randn(240, 320) * 60 + 60
+            image1      = np.random.randn(480, 640) * 60 + 60
             image2      = image1.copy()
-            shift       = np.array([-5, -15])*1
-            image1      = np.roll(image1, shift, axis=(0, 1))  
+            shift       = np.array([0, 15])*1
+            image2      = np.roll(image2, shift, axis=(0, 1))  
             self.imgL, self.imgR, self.imgD = np.uint8(image1), np.uint8(image2), np.uint8(image1)
 
         elif img_type == 22:
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
             #self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE)    
-            self.imgR = np.roll(self.imgL, np.array([-5, 15]), axis=(0, 1)) 
+            self.imgR = np.roll(self.imgL, np.array([0, 15]), axis=(0, 1)) 
 
         else:
             self.tprint('Incorrect image type to load')        
@@ -173,7 +183,6 @@ class DepthEstimator:
         focal_len           = 175.910019
         baseline            = 94.773
         #replacementDepth    = focal_len *  baseline / (RectScaledInfra1.x - (maxLoc.x + RectScaledInfra2.x)); 
-
      
     def depth_opencv(self):
         "computes depth from L and R images"
@@ -195,7 +204,6 @@ class DepthEstimator:
         self.imgC =  disparity_normalized
         self.tprint('stop processing')
         return True
-
 
     def depth_opencv_advanced(self):
         "image computation using more elaborate features"   
@@ -309,18 +317,30 @@ class DepthEstimator:
         yi      = np.arange(0, height)  
 
         # 
-        xg, yg = np.meshgrid(xi, yi, indexing='ij')
-        test_points = np.array([xg.ravel(), yg.ravel()]).T
+        xg, yg  = np.meshgrid(xi, yi, indexing='ij')
+        xg, yg  = xg.T.astype(np.float32), yg.T.astype(np.float32)
 
-     
-        interp = RegularGridInterpolator([y, x], mvx, bounds_error=False, fill_value=None)
-        mvxi   = interp(test_points, method='linear').reshape((height,width))
-        interp = RegularGridInterpolator([y, x], mvy, bounds_error=False, fill_value=None)
-        mvyi   = interp(test_points, method='linear').reshape((height,width))
+        # test_points = np.array([xg.ravel(), yg.ravel()]).T
+        # interp = RegularGridInterpolator([y, x], mvx, bounds_error=False, fill_value=None)
+        # mvxi   = interp(test_points, method='linear').reshape((height,width))
+        # interp = RegularGridInterpolator([y, x], mvy, bounds_error=False, fill_value=None)
+        # mvyi   = interp(test_points, method='linear').reshape((height,width))
+
+        mvxi    = cv.remap(mvx, xg, yg, cv.INTER_LINEAR)
+        mvyi    = cv.remap(mvy, xg, yg, cv.INTER_LINEAR)
 
         flow    = np.stack((mvxi,mvyi),axis = 2)
         return fp, flow  
     
+    def count_bits(self, block1, block2):
+        "metric used in RS"
+        block1_ci    = block1.shape[0] >> 1
+
+        block1_bool  = block1 > block1[block1_ci,block1_ci]
+        block2_bool  = block2 > block2[block1_ci,block1_ci]
+        diff_bool    = np.logical_xor(block1_bool, block2_bool)
+        return diff_bool.sum()
+
     def block_match_in_search_region(self, match_block, search_region):
         "single block matching in search region"
         #block1 = f1[i:i + block_size, j:j + block_size]
@@ -335,7 +355,8 @@ class DepthEstimator:
         for r in range(0, search_range_r - block_size_r ): # r
             for c in range(0, search_range_c - block_size_c ): # c
                 block2              = search_region[r:r + block_size_r,c:c + block_size_c]
-                mad                 = np.sum(np.abs(match_block - block2))
+                #mad                 = np.sum(np.abs(match_block - block2))
+                mad                 = self.count_bits(match_block, block2)
                 search_result[r,c]  = mad
 
         # find first minima
@@ -347,7 +368,7 @@ class DepthEstimator:
         c_min, c_max   = np.maximum(0,best_c-suppres_size),np.minimum(search_range_c,best_c+suppres_size)
         best_v         = search_result[r_min:r_max,c_min:c_max].min()
         search_result[r_min:r_max,c_min:c_max]= 1e9
-        best_v2        = search_result.min()
+        best_v2        = search_result.min() + 1e-9
         best_conf      = 1 - best_v/best_v2
 
         return  best_r, best_c, best_conf   
@@ -394,7 +415,7 @@ class DepthEstimator:
                 best_r          = best_r - block_size_r # offset
 
                 #block3          = f2[i + best_r:i + best_r + block_size, j + best_c:j + best_c + block_size]
-                fp[i:i + block_size, j:j + block_size] = block3
+                fp[i:i + block_size, j:j + block_size] = np.uint8(block3 >> 1) + np.uint8(fp[i:i + block_size, j:j + block_size] >> 1)
                 iblk            = i // block_size 
                 jblk            = j // block_size 
                 mvx[iblk, jblk] = best_c
@@ -402,25 +423,33 @@ class DepthEstimator:
                 mvc[iblk, jblk] = best_v
                        
 
-        # interpolate to the size of the original image
-        x      = np.arange(0, mvx.shape[1]) * block_size
-        y      = np.arange(0, mvx.shape[0]) * block_size
-        #
-        #data   = ff(xg, yg)
-        xi      = np.arange(0, width)
-        yi      = np.arange(0, height)  
+        # # interpolate to the size of the original image
+        # x      = np.arange(0, mvx.shape[1]) * block_size
+        # y      = np.arange(0, mvx.shape[0]) * block_size
+        # #
+        # #data   = ff(xg, yg)
+        # xi      = np.arange(0, width)
+        # yi      = np.arange(0, height)  
 
-        # 
-        xg, yg = np.meshgrid(xi, yi, indexing='ij')
-        test_points = np.array([xg.ravel(), yg.ravel()]).T
+        # xg, yg  = np.meshgrid(xi, yi, indexing='ij')
+        # xg, yg  = xg.T.astype(np.float32), yg.T.astype(np.float32)
 
-     
-        interp = RegularGridInterpolator([y, x], mvx, bounds_error=False, fill_value=None)
-        mvxi   = interp(test_points, method='linear').reshape((height,width))
-        interp = RegularGridInterpolator([y, x], mvy, bounds_error=False, fill_value=None)
-        mvyi   = interp(test_points, method='linear').reshape((height,width))
-        interp = RegularGridInterpolator([y, x], mvc, bounds_error=False, fill_value=None)
-        mvci   = interp(test_points, method='linear').reshape((height,width))
+        # test_points = np.array([xg.ravel(), yg.ravel()]).T
+        # interp = RegularGridInterpolator([y, x], mvx, bounds_error=False, fill_value=None)
+        # mvxi   = interp(test_points, method='linear').reshape((height,width))
+        # interp = RegularGridInterpolator([y, x], mvy, bounds_error=False, fill_value=None)
+        # mvyi   = interp(test_points, method='linear').reshape((height,width))
+        # interp = RegularGridInterpolator([y, x], mvc, bounds_error=False, fill_value=None)
+        # mvci   = interp(test_points, method='linear').reshape((height,width))
+
+        # mvxi    = cv.remap(mvx, xg, yg, cv.INTER_LINEAR)
+        # mvyi    = cv.remap(mvy, xg, yg, cv.INTER_LINEAR)
+        # mvci    = cv.remap(mvc, xg, yg, cv.INTER_LINEAR)
+
+        mvxi     = cv.resize(mvx, (width, height), interpolation = cv.INTER_CUBIC)
+        mvyi     = cv.resize(mvy, (width, height), interpolation = cv.INTER_CUBIC)
+        mvci     = cv.resize(mvc, (width, height), interpolation = cv.INTER_CUBIC)
+
         flow    = np.stack((mvxi,mvyi,mvci),axis = 2)
 
         return fp, flow      
@@ -488,7 +517,7 @@ class DepthEstimator:
             vis = img
 
         # check confidence
-        if len(flow.shape) > 2:
+        if flow.shape[2] > 2:
             imgc = np.uint8(255*flow[:,:,2])
             cv.imshow('Flow Confidence', imgc)    
             ch = cv.waitKey(1)        
@@ -596,9 +625,9 @@ class TestDepthEstimator(unittest.TestCase):
     def test_block_matching(self):
         "depth from block matching - bruit force"
         p           = DepthEstimator()
-        isOk        = p.init_image(3)
+        isOk        = p.init_image(21)
         isOk        = p.show_images_left_right()
-        img, flow   = p.block_matching(p.imgL, p.imgR, block_size=16, search_range=32)
+        img, flow   = p.block_matching(p.imgL, p.imgR, block_size=24, search_range=64)
         isOk        = p.show_flow(img, flow, step=16)
         ch = cv.waitKey()
         self.assertFalse(p.imgD is None)          
@@ -606,7 +635,7 @@ class TestDepthEstimator(unittest.TestCase):
     def test_block_matching_with_confidence(self):
         "depth from block matching - bruit force with confidence"
         p           = DepthEstimator()
-        isOk        = p.init_image(22)
+        isOk        = p.init_image(4)
         isOk        = p.show_images_left_right()
         img, flow   = p.block_matching_with_confidence(p.imgL, p.imgR, block_size=16, search_range=32)
         isOk        = p.show_flow(img, flow, step=16)
