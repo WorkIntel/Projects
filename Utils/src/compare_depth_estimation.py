@@ -53,8 +53,10 @@ log.addHandler(console_handler)
 # logger.addHandler(file_handler)
 
 
+# ----------------------
 #%% Main
 class DepthEstimator:
+
     def __init__(self):
 
         self.frame_size = (640,480)
@@ -68,7 +70,6 @@ class DepthEstimator:
 
         # stream
         self.cap         = None
-
 
     def init_image(self, img_type = 1):
         # create some images for test
@@ -609,7 +610,6 @@ class DepthEstimator:
         else:
             log.info(txt)
   
-
 # ----------------------
 #%% Tests
 class TestDepthEstimator(unittest.TestCase):
@@ -705,7 +705,7 @@ class TestDepthEstimator(unittest.TestCase):
     def test_block_matching_with_confidence_2d(self):
         "depth from block matching - bruit force with confidence - search in 2D"
         p           = DepthEstimator()
-        isOk        = p.init_image(4)  # 21,22 - ok
+        isOk        = p.init_image(14)  # 21,22 - ok
         isOk        = p.show_images_left_right()
         img, flow   = p.block_matching_with_confidence_2d(p.imgL, p.imgR, block_size=24, search_range=56)
         isOk        = p.show_flow(img, flow, step=16)
