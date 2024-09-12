@@ -17,319 +17,18 @@ How to test:
 -----------------------------
  Ver	Date	 Who	Descr
 -----------------------------
-0101   28.08.22  UD     Created
+0101   28.08.24  UD     Created
 -----------------------------
 
 '''
    
-
-#%% Old Code
-#    def ComputeCorrelationAugmentedCoeffOld(self, imgArray, coeffArray, lblId = 0):
-#        # computes correlation  - per single label   
-#        start_time          = time.time()
-#        coeffH, coeffW,  augmentNum, coeffNum = coeffArray.shape
-#            
-#        #searchH, searchW, searchNum = imgArray.shape
-#        searchH, searchW, searchC = imgArray.shape
-#        
-#        # checks
-#        if searchH < coeffH or searchW < coeffW :  # 
-#            self.Print('searchSide less than coeffSide ','E')
-#            return None
-#        
-#        # debug
-#        corrH     = searchH - coeffH  +  1
-#        corrW     = searchW - coeffW  +  1
-#        corrData  = np.zeros((corrH,corrW,augmentNum,coeffNum),dtype=np.float32)
-#        imgArray  = imgArray.astype(np.float32)
-#        coeffArray = coeffArray.astype(np.float32)
-#        imageGray = cv.cvtColor(imgArray,cv.COLOR_RGB2GRAY)
-#
-#        
-#        coeffW2   = coeffW/2
-#        coeffH2   = coeffH/2   
-#        
-#        peakOffset = np.zeros((2,augmentNum,coeffNum))
-#        peakValue = np.zeros((1,augmentNum,coeffNum))
-#        
-#        score     = 0.0
-#        for k in range(coeffNum):
-#            for c in range(augmentNum):
-#            
-#                templGray   = coeffArray[:,:,c,k]
-#                result      = cv.matchTemplate(imageGray, templGray, cv.TM_CCOEFF_NORMED)                
-#                corrData[:,:,c,k] =  result
-#            
-#                # compute max score
-#                min_val, max_val, min_indx, max_indx = cv.minMaxLoc(result)
-#                #score         += max_val
-#                peakOffset[0,c,k] = max_indx[0] + coeffW2
-#                peakOffset[1,c,k] = max_indx[1] + coeffH2
-#                peakValue[0,c,k]  = max_val
-#                
-#                self.Print('Filt %d : Ang %+2d, max: %f' %(k, self.WARP_ANGLES[c], max_val),'I')
-#                # mark in color
-#                #corrData[max_indx[1],max_indx[0],c,k] = 0
-#            
-#        # center
-#        #peakOffset = peakOffset + 1 # small correction 
-#        score      = peakValue.max()
-##        maxindex    = peakValue.argmax()
-##        peak_index = np.unravel_index(maxindex, peakValue.shape)
-##        peak_c,peak_k = peak_index[1], peak_index[2]
-#        
-#        # like sigmoid squash
-#        thr        = np.maximum(score*0.9, 0.8)
-#        
-##        corrData   = 5*(corrData - thr)
-##        corrData   = 1/(1 + np.exp(-corrData))
-#        corrData[corrData < thr] = 0
-#        
-#        
-#        
-#        
-#        #self.Print('C-Match done with score %f' %score)
-#        #self.Print('Index:')
-#        #print(peak_index)
-#        #self.Print('Offsets:')
-#        #print(peakOffset[:,peak_c,peak_k])
-#        
-##        #debug
-##        plt.figure(2)
-##        plt.subplot(1,1,1),plt.imshow(corrData.squeeze(),cmap = 'gray')
-##        plt.title('corrData'), #plt.xticks([]), plt.yticks([])
-##        plt.show()  
-#
-##        self.ShowFeatures(corrData, lblId)        
-#        
-#         # check
-#        elapsed_time = time.time() - start_time
-#        #self.Print('Best %d : Ang %d, max: %f' %(peak_k, self.WARP_ANGLES[peak_c], score),'I')
-#        self.Print('Processing score %f in %f sec' %(score,elapsed_time))
-#        return corrData     
-
-
-#    def ComputeFiltersAugmentedOld(self, templateArray):
-#        # create filter array from already augmented imafe data
-#        #img               = self.ImagePreprocessing(img)
-#        hp, wp, dp, n_labels  = templateArray.shape
-#        if dp != 3:
-#            self.Print('Filters should have color','E')
-#            return
-#            
-#        warp_angles         = self.WARP_ANGLES
-#        warp_scales         = self.WARP_SCALES
-#        warp_num            = len(warp_angles)*len(warp_scales)
-#        
-#        file_num_f          = n_labels/warp_num
-#        file_num            = int(file_num_f)            
-#        if (file_num_f - file_num) != 0:
-#            self.Print('Augmentation problem','E')
-#            return
-#        
-#        filterArray         = np.zeros((hp,wp,warp_num,file_num))
-#        for k in range(file_num):
-#            for w in range(warp_num):
-#                ii                  = k*warp_num + w
-#                templGray           = cv.cvtColor(templateArray[:,:,:,ii],cv.COLOR_RGB2GRAY)
-#                filterArray[:,:,w,k]= templGray            
-#        
-#        return filterArray #.astype(np.uint8)  
-#    
-#    def ComputeImageDistance(self, templateArray):
-#        # Use lie derivatives idea
-#        hp, wp, dp, n_labels       = templateArray.shape
-#        
-#        # define shifts
-#        max_shift, max_angle, max_scale       = 5, 5, 0.3
-#        num_shift, num_angle, num_scale       = 3, 3, 3
-#        
-#        rng_shift = np.linspace(-max_shift,  max_shift, num_shift)  
-#        rng_angle = np.linspace(-max_angle,  max_angle, num_angle) 
-#        rng_scale = np.linspace(1-max_scale, 1+max_scale, num_scale) 
-#        
-#        x, y, a, s = np.meshgrid(rng_shift, rng_shift, rng_angle, rng_scale)  
-#        x, y, a, s = x.ravel(), y.ravel(), a.ravel(), s.ravel() 
-#        
-#        
-#        # transform - OK
-#        #img_gray_tr          = cv_warp(img_gray)
-#        #plot_img_and_img_transformed(img_gray, img_gray_tr)
-#
-#        
-##        # check if this is working
-##        img_gray1           = templateArray[:,:,0,0]
-##        img_warp_array1     = cv_warp_array(img_gray1, x, y, a, s)
-##        self.ShowWarpedTemplates(img_warp_array1, '1')
-##        
-##        img_gray2           = templateArray[:,:,0,1]
-##        img_warp_array2     = cv_warp_array(img_gray2, x, y, a, s)
-##        self.ShowWarpedTemplates(img_warp_array2, '2')
-##        
-##        plot_img_and_img_transformed(img_gray1, img_gray2)
-##        
-##        dist_mtrx           = cv_warp_distance(img_warp_array1, img_warp_array2)
-#        #debug
-##        plt.figure(21)
-##        plt.subplot(1,1,1),plt.imshow(dist_mtrx,cmap = 'gray')
-##        plt.title('dist_mtrx')# plt.xticks([]), plt.yticks([])
-##        plt.show()          
-#        
-##        min_val, max_val, min_indx, max_indx = cv.minMaxLoc(dist_mtrx)
-##        #min_value           = np.min(dist_mtrx)
-##        #result              = np.unravel_index(np.min(dist_mtrx),dist_mtrx.shape)
-##        print("Index for the Minimum Value {} in the 2D Array is: {}".format(min_val,min_indx))
-##        
-##        img_gray       = img_warp_array1[:,:,min_indx[1]]
-##        img_gray_tr    = img_warp_array2[:,:,min_indx[0]]
-##        plot_img_and_img_transformed(img_gray, img_gray_tr)
-#        
-#            
-#        # run over all templates and create template to template distance
-#        resultArray = np.zeros((n_labels, n_labels))
-#        for i1 in range(n_labels):
-#            img_gray1           = templateArray[:,:,0,i1]
-#            img_warp_array1     = cv_warp_array(img_gray1, x, y, a, s)
-#            
-#            self.Print('%d' %i1)
-#            for i2 in range(n_labels):
-#                if i1 == i2:
-#                    continue
-#                img_gray2           = templateArray[:,:,0,i2]
-#                img_warp_array2     = cv_warp_array(img_gray2, x, y, a, s)
-#                
-#                dist_mtrx           = cv_warp_distance(img_warp_array1, img_warp_array2)
-#                min_val, max_val, min_indx, max_indx = cv.minMaxLoc(dist_mtrx)
-#                
-#                resultArray[i1,i2]  = min_val
-#                
-#                img_gray            = img_warp_array1[:,:,min_indx[1]]
-#                img_gray_tr         = img_warp_array2[:,:,min_indx[0]]
-#                plot_img_and_img_transformed(img_gray, img_gray_tr, min_val)
-#
-#                            
-#        
-#        #debug
-#        plt.figure(33)
-#        plt.subplot(1,1,1),plt.imshow(resultArray,cmap = 'gray')
-#        plt.title('resultArray'), #plt.xticks([]), plt.yticks([])
-#        plt.show()          
-#        
-#        
-#        return img_gray1 #.astype(np.uint8) 
-
-
-    
-
-    
-#    def FindMaximas(self, imgCorr, minThr = 0.9):
-#        # find different coordinates
-#        peakXY = np.ones((2,3))
-#        if imgCorr is None:
-#            return peakXY
-#        
-#        #imgHist                             = cv.GaussianBlur(imgHist,(5,5),0)   
-#        #imgHist                             = cv.boxFilter(imgHist,-1,(5,5),normalize = True)
-#        
-#        min_val, max_val, min_indx, max_indx = cv.minMaxLoc(imgCorr)
-#        if max_val > minThr:
-#            peakXY[0,0] = max_indx[0] 
-#            peakXY[0,1] = max_indx[1] 
-#            peakXY[0,2] = max_val 
-#        # remove the neighborhood
-#        ns  = np.int32(5)
-#        ixs, ixe  = np.maximum(0, max_indx[0] - ns), np.minimum(imgCorr.shape[1], max_indx[0] + ns)
-#        iys, iye  = np.maximum(0, max_indx[1] - ns), np.minimum(imgCorr.shape[0], max_indx[1] + ns)
-#        imgCorr[iys:iye,ixs:ixe] = 0
-#        # second max
-#        min_val, max_val, min_indx, max_indx = cv.minMaxLoc(imgCorr)
-#        peakXY[1,0] = max_indx[0] 
-#        peakXY[1,1] = max_indx[1] 
-#        peakXY[1,2] = max_val 
-#        
-##            [iy,ix]  = np.where(imgHist > 0.9*max_val)
-##            peakXY   = np.hstack((ix.reshape((-1,1)),iy.reshape((-1,1)), imgHist[iy,ix].reshape((-1,1))))
-#           
-#        return peakXY     
-
- 
-#    
-#    def ComputeCorrelationTemplates(self, imgArray, coeffArray):
-#        # computes correlation  - adds channels together      
-#        coeffH, coeffW,  coeffC, coeffNum = coeffArray.shape
-#            
-#        #searchH, searchW, searchNum = imgArray.shape
-#        searchH, searchW, searchC = imgArray.shape
-#        
-#        # checks
-#        if searchH < coeffH or searchW < coeffW :  # 
-#            self.Print('searchSide less than coeffSide ','E')
-#            return None
-#                
-#        if coeffC != searchC:  # 
-#            self.Print('Number of channels in image and template missmatch ','E')
-#            return None
-#        
-#        # correlate
-#        #offsetsXY  = np.zeros((coeffNum,2),dtype= np.int32)
-#        
-#        # debug
-#        corrH     = searchH - coeffH  +  1
-#        corrW     = searchW - coeffW  +  1
-#        corrData  = np.zeros((corrH,corrW,coeffNum),dtype=np.float32)
-#        imgArray  = imgArray.astype(np.float32)
-#        coeffArray  = coeffArray.astype(np.float32)
-#        
-#        imageGray = cv.cvtColor(imgArray,cv.COLOR_RGB2GRAY)
-#
-#        
-#        coeffW2   = coeffW/2
-#        coeffH2   = coeffH/2   
-#        
-#        peakOffset = np.zeros((2,coeffNum))
-#        peakValue = np.zeros((1,coeffNum))
-#        
-#        score     = 0.0
-#        for k in range(coeffNum):
-#            
-#            templGray   = cv.cvtColor(coeffArray[:,:,:,k],cv.COLOR_RGB2GRAY)
-#            result      = cv.matchTemplate(imageGray, templGray, cv.TM_CCOEFF_NORMED)                
-#            corrData[:,:,k] =  result
-#            
-#            # compute max score
-#            min_val, max_val, min_indx, max_indx = cv.minMaxLoc(corrData[:,:,k])
-#            score         += max_val
-#            peakOffset[0,k] = max_indx[0] + coeffW2
-#            peakOffset[1,k] = max_indx[1] + coeffH2
-#            peakValue[0,k]    = max_val
-#                
-##            else:
-#            self.Print('Coeff %d : max: %f , min: %f' %(k, max_val, min_val),'I')
-#            
-#        # center
-#        peakOffset = peakOffset + 1 # small correction 
-#        score      = score / coeffNum
-#        self.Print('C-Match done with score %f' %score)
-#        self.Print('Values:')
-#        print(np.round(peakValue*100)/100)
-#        self.Print('Offsets:')
-#        print(peakOffset)
-#        
-##        #debug
-##        plt.figure(2)
-##        plt.subplot(1,1,1),plt.imshow(corrData.squeeze(),cmap = 'gray')
-##        plt.title('corrData'), #plt.xticks([]), plt.yticks([])
-##        plt.show()          
-#        
-#        
-#        return corrData    
 
 import os
 import numpy as np
 import cv2 as cv
 #import json
 #import copy
-import random
+#import random
 import json
 
 from glob import glob
@@ -338,6 +37,7 @@ from matplotlib import pyplot as plt
 #from common import draw_str, RectSelector
 #import video
 #from skimage.feature import peak_local_max
+from sklearn.cluster import KMeans
 
 import time
 import unittest
@@ -345,9 +45,8 @@ import logging
 
 
 
-
-#%%
-
+# ----------------
+#%% Helpers
 def rnd_warp(a):
     h, w    = a.shape[:2]
     T       = np.zeros((2, 3))
@@ -408,9 +107,6 @@ def cv_warp_distance(img_warp_array1, img_warp_array2):
              
      return dist_mtrx
              
-     
-    
-
 def plot_img_and_img_transformed(img, img_tr, val = 0):
 #    fig, axs = plt.subplots(ncols=2, figsize=(16, 4), sharex=True, sharey=True)
 #    axs[0].imshow(img)
@@ -431,6 +127,7 @@ def plot_img_and_img_transformed(img, img_tr, val = 0):
     plt.pause(1)
     
 
+# ----------------
 #%% Deals with multuple templates
 class LabelMatchManager:
     
@@ -471,8 +168,7 @@ class LabelMatchManager:
         #self.arrayData          = None
         #self.arrayMask          = None
 
-        self.Print('L-Manager is created')
-        
+        self.Print('L-Manager is created')        
         
     def LoadTrainingFiles(self, topDirPath = '', fileNumToLoad = 0):
         # load jpg files from training directories
@@ -542,8 +238,7 @@ class LabelMatchManager:
         #self.imagePath          = framePathE
         #self.state              = dataFound
         return framePathE,  jsonPathE   
-    
-    
+     
     def GetPointsAndIdsFromJsonFile(self, jsonPath = None):
         # output
         objects_label_data  = []
@@ -675,7 +370,6 @@ class LabelMatchManager:
         #self.labelNames = objects_label_names
         
         return objects_label_data , objects_label_names
-    
     
     def GetImageDataFromFile(self, framePath = None):
         # output
@@ -890,7 +584,6 @@ class LabelMatchManager:
                                    
         return imgArray, pointArray  
     
-        
     def ConvertFilesToObjectsWithAugmentation(self):
         # Extract the templates  and offsets
         self.frameList , self.templateList , self.offsetList  = [], [], []
@@ -972,10 +665,10 @@ class LabelMatchManager:
             
         return tempData, tempOffs    
     
-    def ComputeDecomposition(self, templateArray):
+    def ComputeDecompositionSVD(self, templateArray):
         # output
         #img               = self.ImagePreprocessing(img)
-        hp, wp, dp, n_labels       = templateArray.shape
+        hp, wp, dp, n_labels  = templateArray.shape
             
         #dataPos              = imgPosArray.transpose(2,0,1).reshape(-1,data.shape[1])            
         dataPos              = templateArray.reshape(-1,n_labels)            
@@ -1012,6 +705,36 @@ class LabelMatchManager:
         
         return flt_image #.astype(np.uint8)
     
+    def ComputeDecomposition(self, templateArray):
+        "K-NN decomposition"
+        # output
+        #img               = self.ImagePreprocessing(img)
+        hp, wp, dp, n_labels  = templateArray.shape
+            
+        #dataPos              = imgPosArray.transpose(2,0,1).reshape(-1,data.shape[1])            
+        dataPos              = templateArray.reshape(-1,n_labels).T            
+        
+        # remove mean
+        #dataPos              = dataPos - np.mean(dataPos,axis = 0)
+        
+        # decompose
+        n_filters           = self.MAX_FILTER_NUM
+        kmeans              = KMeans(n_clusters=n_filters, random_state=0, n_init="auto").fit(dataPos)
+        
+        # loss estimates
+        # totalEnergy         = np.sum(sp)
+        # coveredEnergy       = np.sum(sp[0:n_filters])
+        # self.Print('Covered energy %4.1f percent' %(coveredEnergy/totalEnergy*100))
+        
+        # filters
+        flt                 = kmeans.cluster_centers_.T       
+          
+        # create image
+        patch_shape          = (hp,wp,dp,n_filters)
+        flt_image            = flt.reshape(patch_shape)
+        
+        return flt_image #.astype(np.uint8)    
+    
     def ComputeFilters(self, templateArray):
         # output
         #img               = self.ImagePreprocessing(img)
@@ -1047,8 +770,6 @@ class LabelMatchManager:
             filterArray[:,:,k]= templGray            
         
         return filterArray #.astype(np.uint8) 
-    
-
 
     def ComputeCorrelationWarpedTemplates(self, imgArray, coeffArray, lblId = 0):
         # computes correlation  - per single label   
@@ -1321,8 +1042,6 @@ class LabelMatchManager:
         self.Print('Counting in %f sec' %(elapsed_time))        
         return corrAccum      
     
-
-    
     def ComputePredictedLabelPositionsOld(self, corrData, offsetArray, lblIds):
         # predict point position using mutual info
         #img               = self.ImagePreprocessing(img)
@@ -1410,8 +1129,7 @@ class LabelMatchManager:
         elapsed_time = time.time() - start_time
         self.Print('Counting in %f sec' %(elapsed_time))        
         return corrAccum      
-    
-    
+      
     def ComputeMatchAndPredictions(self, imgIn, lblIds):
         # matching several labels
         # precompute the filters
@@ -1809,29 +1527,23 @@ class TestLabelMatchManager(unittest.TestCase):
 
     def test_ComputeDecomposition(self):
         # not applicable
-        #filePath    = r'D:\RobotAI\Customers\TED\Objects\object1\labels'
-        #filePath    = r'D:\RobotAI\Customers\TM\Objects\MaskBox-03\labels'
-        #filePath    = r'D:\RobotAI\Customers\TM\Objects\MaskBox-03\labels\mask_box_up'
-        filePath    = r'D:\RobotAI\Customers\Moona\Objects\PlugUSB-IDS\videos\object_01'
-        lblId       = 3
-        
+        filePath    = r'C:\Users\udubin\Documents\Code\RAI\Objects\CupRGB-02\videos\object_0007'
+        lblId       = 7      
         d           = LabelMatchManager()
         d.MAX_FILES_TO_LOAD   = 64
+
         isOk        = d.LoadTrainingFiles(filePath)
         isOk        = d.ConvertFilesToObjects()
-        tempData    = d.GetTemplatesPerLabel(lblId)
+        tempData,tempOff    = d.GetTemplatesPerLabel(lblId)
         flt         = d.ComputeDecomposition(tempData)
         
         d.ShowTemplatesPerLabel(49,lblId)
         d.ShowFilters(flt)
+        cv.waitKey()
         
     def test_ComputeCorrelation(self):
         # shows data per label 
-        #filePath    = r'D:\RobotAI\Customers\TED\Objects\object1\labels'
-        #filePath    = r'D:\RobotAI\Customers\TM\Objects\MaskBox-03\labels'
-        #filePath    = r'D:\RobotAI\Customers\TM\Objects\MaskBox-03\labels\mask_box_up'
-        #filePath    = r'D:\RobotAI\Customers\Moona\Objects\PlugUSB-IDS\videos\object_01'
-        filePath    = r"D:\RobotAI\Customers\Shiba\Objects\Scissors_04\videos\object_0000"
+        filePath    = r'C:\Users\udubin\Documents\Code\RAI\Objects\CupRGB-02\videos\object_0007'
 
         lblId       = 1
         imgId       = 2
@@ -1843,7 +1555,7 @@ class TestLabelMatchManager(unittest.TestCase):
         
         isOk        = d.LoadTrainingFiles(filePath)
         isOk        = d.ConvertFilesToObjects()
-        tempData    = d.GetTemplatesPerLabel(lblId)
+        tempData, tempOffset    = d.GetTemplatesPerLabel(lblId)
         #coeffArray   = d.ComputeDecomposition(tempData)
         coeffArray   = tempData #
         
@@ -1994,9 +1706,9 @@ if __name__ == '__main__':
     #singletest.addTest(TestLabelMatchManager("test_LoadTrainingFiles")) # ok
     #singletest.addTest(TestLabelMatchManager("test_ConvertFilesToObjects")) # ok
     #singletest.addTest(TestLabelMatchManager("test_ConvertFilesToObjectsWithAugmentation")) # ok       
-    singletest.addTest(TestLabelMatchManager("test_ShowTemplatesPerLabel")) # ok
+    #singletest.addTest(TestLabelMatchManager("test_ShowTemplatesPerLabel")) # ok
     
-    #singletest.addTest(TestLabelMatchManager("test_ComputeDecomposition"))
+    singletest.addTest(TestLabelMatchManager("test_ComputeDecomposition"))
     #singletest.addTest(TestLabelMatchManager("test_ComputeCorrelation")) # 
     #singletest.addTest(TestLabelMatchManager("test_ComputeImageDistance"))
     #singletest.addTest(TestLabelMatchManager("test_ComputeWarpedCorrelation")) # ok
