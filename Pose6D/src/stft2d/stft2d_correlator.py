@@ -14,6 +14,7 @@ Usage:
 -----------------------------
  Ver    Date     Who    Descr
 -----------------------------
+0103   14.09.24 UD     Correlation improvements with mean substraction.
 0102   08.09.24 UD     Created as class.
 0101   21.08.24 UD     Started. 
 -----------------------------
@@ -34,25 +35,6 @@ import sys
 sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
 from common import log
-
-# #%% Logger
-# import logging
-# log         = logging.getLogger("robot")
-# #formatter   = logging.Formatter('[%(asctime)s.%(msecs)03d] {%(filename)6s:%(lineno)3d} %(levelname)s - %(message)s', datefmt="%M:%S", style="{")
-# formatter   = logging.Formatter('[%(asctime)s] - [%(filename)12s:%(lineno)3d] - %(levelname)s - %(message)s')
-# log.setLevel("DEBUG")
-
-# console_handler = logging.StreamHandler()
-# console_handler.setLevel("DEBUG")
-# console_handler.setFormatter(formatter)
-# log.addHandler(console_handler)
-
-# # file_handler = logging.FileHandler("main_app.log", mode="a", encoding="utf-8")
-# # file_handler.setLevel("WARNING")
-# # file_handler.setFormatter(formatter)
-# # logger.addHandler(file_handler)
-
-
 
 # ----------------------
 #%% Helper function
@@ -79,6 +61,14 @@ def ifft_multiply(a, b):
   performs IFFT2 and then mult two arrays.
   """
   c = ifft2(a) * b
+  return c
+
+def subtract_mean(a, d):
+  """
+  removes mean from 3 and 4 dim.
+  """
+  b = a.mean(axis = (2,3), keepdims = True)
+  c = a - b
   return c
 
 def block_process(big_array: np.array, small_array: np.array, fun):
@@ -176,12 +166,12 @@ class DataGenerator:
         elif img_type == 6: # same image with shift
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
-            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+            self.imgR = np.roll(self.imgL, np.array([-4, -4]), axis=(0, 1))
 
-        elif img_type == 7: # same image with shift
+        elif img_type == 7: # same image with shift - sub region
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
-            self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)[100:228, 100:228]
-            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+            self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)[100:328, 300:528]
+            self.imgR = np.roll(self.imgL, np.array([-4, -4]), axis=(0, 1))
 
         elif img_type == 11:  # Test patterns for correlation
             image_patch = np.ones((16, 16))
@@ -193,7 +183,7 @@ class DataGenerator:
             self.imgL, self.imgR = image1, image2
 
         elif img_type == 12:  # Test pattern against image - in sync
-            image1      = np.random.randn(128, 128) * 60 + 0
+            image1      = np.random.rand(128, 128) * 60 + 0
             offset      = 32
             image_patch = image1[offset:offset+window_size,offset:offset+window_size]
             image2      = np.tile(image_patch, (8, 8))
@@ -202,7 +192,7 @@ class DataGenerator:
             self.imgL, self.imgR = image1, image2
 
         elif img_type == 13:  # Test pattern against image - half win shift
-            image1      = np.random.randn(128, 128) * 60 + 0
+            image1      = np.random.rand(128, 128) * 60 + 0
             offset      = 40
             image_patch = image1[offset:offset+window_size,offset:offset+window_size]
             image2      = np.tile(image_patch, (8, 8))
@@ -211,7 +201,7 @@ class DataGenerator:
             self.imgL, self.imgR = image1, image2
 
         elif img_type == 14:  # Test pattern against image - half win shift
-            image1      = np.random.randn(128, 128) * 60 + 0
+            image1      = np.random.rand(128, 128) * 60 + 0
             offset      = [40,32]
             image_patch = image1[offset[0]:offset[0]+window_size,offset[1]:offset[1]+window_size]
             image2      = np.tile(image_patch, (8, 8))
@@ -220,20 +210,19 @@ class DataGenerator:
             self.imgL, self.imgR = image1, image2          
 
         elif img_type == 21:  # Test one image against image 
-            image1      = np.random.randn(128, 128) * 60 + 60
+            image1      = np.random.rand(128, 128) * 60 + 60
             image2      = image1.copy()
-            shift       = np.array([5, -2])*1
+            shift       = np.array([-5, -8])*1
             image1      = np.roll(image1, shift, axis=(0, 1))  
             self.imgL, self.imgR = image1, image2   
 
-        # Select test case
-        elif img_type == 31:  # Test random image
-            image1      = np.random.randn(128, 128) * 60 + 60
-            shift       = np.array([2, 2]) * 1
+        elif img_type == 22:  # Test random image
+            image1      = np.random.rand(128, 128) * 60 + 60
+            shift       = np.array([4, 4]) * -1
             image2      = np.roll(image1, shift, axis=(0, 1))
             self.imgL, self.imgR = image1, image2
 
-        elif img_type == 32:  # Test simple image
+        elif img_type == 31:  # Test simple image
             # Assuming 'trees' is a predefined image
             image       = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_1004.png")
             image1      = cv.cvtColor(image, cv.COLOR_RGB2GRAY)      
@@ -241,7 +230,7 @@ class DataGenerator:
             image2      = np.roll(image1, shift, axis=(0, 1))
             self.imgL, self.imgR = image1, image2
 
-        elif img_type == 33:  # Small size
+        elif img_type == 32:  # Small size
             image1      = np.zeros((64, 64))
             image1[4 * window_size // 2 : 4 * window_size // 2 + window_size,
                     4 * window_size // 2 : 4 * window_size // 2 + window_size] = 100
@@ -314,6 +303,7 @@ class DataGenerator:
     def show_images(self):
         "show images left and right"
         image_out   = np.concatenate((self.imgL, self.imgR), axis = 1) 
+        image_out   = np.uint8(image_out)
         while image_out.shape[1] > 1999:
             image_out = cv.impyrDown(image_out)
 
@@ -331,7 +321,15 @@ class STFT2D:
 
         self.frame_size     = (640,480)
 
-    def stft2d(self, Im, window_size=16, corr_enabled=False):
+    def preprocess(self, img, corr_enabled = False):
+        "image preprocessing - converts from uint8 to float using log function"
+        img            = img.astype(np.float64)
+
+        img            = np.log(img + 1.0) if corr_enabled else img
+        #img            = (img-img.mean()) / (img.std()+1e-9)
+        return img
+
+    def stft2d(self, Im, window_size=16, corr_enabled=False, no_mean = False):
         """
         Performs 2D short-time Fourier transform (STFT) on a grayscale image.
 
@@ -356,8 +354,7 @@ class STFT2D:
             raise ValueError("Image must be 2D array")
 
         # Convert image to double and grayscale if necessary
-        Im            = Im.astype(np.float64)
-
+        Im            = self.preprocess(Im, no_mean)
 
         # Get image dimensions and number of color channels
         n_rows, n_cols = Im.shape
@@ -388,12 +385,13 @@ class STFT2D:
         if corr_enabled :
             #center_idx = window_size // 2
             #dc_mask[center_idx-1:center_idx+1, center_idx-1:center_idx+1] = 0
-            dc_mask[0,0]             = 0
+            #dc_mask[0,0]             = 0
             #dc_mask[window_size-1,0] = 0
             #dc_mask[0,window_size-1] = 0
             #dc_mask[window_size-1,window_size-1] = 0
-            translations      = translations * 0  # no offsets
-
+            translations             = translations * 0  # no offsets
+        #    frequency_mask    = window_mask
+        #else:
         frequency_mask      = dc_mask #fftshift(dc_mask) # np.tile(fftshift(dc_mask), (row_win_num, col_win_num))
 
         # Initialize STFT output
@@ -405,6 +403,9 @@ class STFT2D:
             #col_indices   = np.arange(active_cols) + translation[1]
 
             image_patch   = Im[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols] #
+
+            if no_mean:
+                image_patch   = block_process(image_patch, window_mask, subtract_mean)
 
             image_patch   = block_process(image_patch, window_mask, multiply)
             fft_patch     = block_process(image_patch, frequency_mask, fft_multiply)
@@ -472,8 +473,8 @@ class STFT2D:
         translations = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)
 
         # For correlation
-        if corr_enabled:
-          translations = translations * 0  # no offsets
+        #if corr_enabled:
+        #  translations = translations * 0  # no offsets
 
 
         # Loop through translations and perform inverse STFT
@@ -519,13 +520,13 @@ class STFT2D:
 
         # Select test case
         if test_type == 1:  # Test random image
-            image = np.random.randn(256, 256) * 30 + 128
+            image = np.random.rand(256, 256) * 30 + 128
         elif test_type == 2:  # Test simple image
             # Assuming 'circuit' is a predefined image
             image = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_1004.png")
             image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
         elif test_type == 3:  # Test different size
-            image = np.random.randn(160, 192) * 10
+            image = np.random.rand(160, 192) * 10
             image[50:58, 50:58] = 180
         elif test_type == 11:  # Test patterns for correlation
             image_patch = np.ones((16, 16))
@@ -575,12 +576,13 @@ class STFT2D:
             raise ValueError("Images must be of the same size")
 
         # Perform STFT
-        image1_stft       = self.stft2d(image1, window_size) #, corr_enabled = False)
-        image2_stft       = self.stft2d(image2, window_size, corr_enabled)
+        image1_stft       = self.stft2d(image1, window_size, corr_enabled = False, no_mean = True) #, corr_enabled = False)
+        image2_stft       = self.stft2d(image2, window_size, corr_enabled = True, no_mean = True)
 
         # Correlate and perform ISTFT
         correlation_stft  = image1_stft * np.conj(image2_stft)
-        correlation_image = self.istft2d(correlation_stft, window_size) #, corr_enabled = True)
+        #correlation_stft  = image1_stft * np.repeat(np.conj(image2_stft[:,:,0])[:,:,np.newaxis],4,axis=2)
+        correlation_image = self.istft2d(correlation_stft, window_size, corr_enabled = True)
 
         return correlation_image
         
@@ -645,22 +647,34 @@ class TestSTFT2D(unittest.TestCase):
         self.assertFalse(img_c is None) 
 
     def test_stft2d_two_images(self):
-        "correlator of left and right images"
+        "correlator of left and right random images"
         w_size  = 32
         p       = STFT2D()
         d       = DataGenerator()
         isOk    = d.init_image(img_type = 21, window_size = w_size)
         img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size)
+        d.show_images()
         p.show_corr_image(img_c)
-        self.assertTrue(isOk)   
+        self.assertTrue(isOk)  
+
+    def test_stft2d_two_real_small_images(self):
+        "correlator of left and right small size images"
+        w_size  = 32
+        p       = STFT2D()
+        d       = DataGenerator()
+        isOk    = d.init_image(img_type = 7, window_size = w_size)
+        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size, corr_enabled = True)
+        d.show_images()
+        p.show_corr_image(img_c)
+        self.assertTrue(isOk)           
 
     def test_stft2d_two_real_images(self):
         "correlator of left and right images"
-        w_size  = 64
+        w_size  = 32
         p       = STFT2D()
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 6, window_size = w_size)
-        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size, corr_enabled = False)
+        isOk    = d.init_image(img_type = 4, window_size = w_size)
+        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size, corr_enabled = True)
         d.show_images()
         p.show_corr_image(img_c)
         self.assertTrue(isOk)                
@@ -714,9 +728,10 @@ if __name__ == '__main__':
 
     #suite.addTest(TestSTFT2D("test_stft2d")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_corr")) # ok
-    suite.addTest(TestSTFT2D("test_stft2d_corr_datagen")) # ok
+    #suite.addTest(TestSTFT2D("test_stft2d_corr_datagen")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_two_images")) # ok
-    #suite.addTest(TestSTFT2D("test_stft2d_two_real_images")) # 
+    #suite.addTest(TestSTFT2D("test_stft2d_two_real_small_images")) # ok
+    suite.addTest(TestSTFT2D("test_stft2d_two_real_images")) # 
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
