@@ -68,6 +68,13 @@ class DepthEstimator:
         # params
         self.MIN_STD_ERROR   = 0.01
 
+        # evaluate mean and std
+        self.rect        = [10,10,13,13]
+        self.imgD_mean   = None
+        self.imgD_std    = None
+        self.imgC_mean   = None
+        self.imgC_std    = None        
+
         # stream
         self.cap         = None
 
@@ -132,19 +139,26 @@ class DepthEstimator:
             self.tprint('Incorrect image type to load')        
 
                                     
-        self.imgC = self.imgD    
+        self.imgC       = self.imgD  
+        self.frame_size = self.imgD.shape[:2:-1] # w,h 
         #self.img        = np.uint8(self.img) 
 
         #self.img = self.add_noise(self.img, 0)
         #self.img = cv.resize(self.img , dsize = self.frame_size)   
         #imgL = cv.pyrDown(self.imgL)  # downscale images for faster processing
         #imgR = cv.pyrDown(self.imgR)
+
+        self.rect       = self.init_roi()
               
         return True
     
     def init_stream(self):
         "read data from real sense"
         self.cap = RealSense(mode = 'iid', use_ir = True)
+
+        self.read_stream()
+        self.init_roi()
+        return 
 
     def read_stream(self):
         "reading data stream from RS"
@@ -162,13 +176,15 @@ class DepthEstimator:
         self.imgR = frame[:,:,1]
         self.imgD = cv.convertScaleAbs(frame[:,:,2], alpha=3) 
         #self.imgD = cv.normalize(frame[:,:,2], None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
-        return
+        return 
       
     def init_roi(self, test_type = 1):
-        "load the test case"
-        roi = [0,0,self.frame_size[0],self.frame_size[1]]
+        "load the roi case"
+        w,h     = self.frame_size
+        w2, h2  = w>>1, h>>1
+        roi     = [0,0,w,h]
         if test_type == 1:
-            roi = [310,230,330,250] # xlu, ylu, xrb, yrb
+            roi = [w2-3,h2-3,w2+3,h2+3] # xlu, ylu, xrb, yrb
         elif test_type == 2:
             roi = [300,220,340,260] # xlu, ylu, xrb, yrb
         elif test_type == 3:
@@ -176,7 +192,9 @@ class DepthEstimator:
         elif test_type == 4:
             roi = [220,140,420,340] # xlu, ylu, xrb, yrb      
         elif test_type == 4:
-            roi = [200,120,440,360] # xlu, ylu, xrb, yrb            
+            roi = [200,120,440,360] # xlu, ylu, xrb, yrb     
+
+        self.rect       = roi       
         return roi 
 
     def convert_disparity_to_depth(self):
@@ -185,6 +203,42 @@ class DepthEstimator:
         baseline            = 94.773
         #replacementDepth    = focal_len *  baseline / (RectScaledInfra1.x - (maxLoc.x + RectScaledInfra2.x)); 
      
+    def compute_noiseD(self):
+        "compute real sense noise"
+        if self.rect is None:
+            self.tprint('define ROI')
+            return 0
+                
+        x0, y0, x1, y1  = self.rect
+        img_roi         = self.imgD[y0:y1,x0:x1].astype(np.float32)
+        
+        if self.imgD_mean is None:
+            self.imgD_mean    = img_roi
+            self.imgD_std    = np.zeros_like(img_roi)
+        
+        self.imgD_mean += 0.1*(img_roi - self.imgD_mean)
+        self.imgD_std  += 0.1*(np.abs(img_roi - self.imgD_mean) - self.imgD_std)
+        err_std         = self.imgD_std.mean()
+        return err_std
+
+    def compute_noiseC(self):
+        "compute calculated disparity noise"
+        if self.rect is None:
+            self.tprint('define ROI')
+            return 0
+                
+        x0, y0, x1, y1  = self.rect
+        img_roi         = self.imgC[y0:y1,x0:x1].astype(np.float32)
+        
+        if self.imgC_mean is None:
+            self.imgC_mean    = img_roi
+            self.imgC_std    = np.zeros_like(img_roi)
+        
+        self.imgC_mean += 0.1*(img_roi - self.imgC_mean)
+        self.imgC_std  += 0.1*(np.abs(img_roi - self.imgC_mean) - self.imgC_std)
+        err_std         = self.imgC_std.mean()
+        return err_std
+
     def depth_opencv(self):
         "computes depth from L and R images"
         self.tprint('start processing')
@@ -229,8 +283,8 @@ class DepthEstimator:
         
         disparity            = stereo.compute(self.imgL, self.imgR) #.astype(np.float32) / 16.0
 
-        disparity_normalized = cv.normalize(disparity, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
-        self.imgC            = disparity_normalized
+        disparity_normalized = disparity/5 #(disparity - disparity.min())*16 #cv.normalize(disparity, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
+        self.imgC            = disparity_normalized.astype(np.uint8)
         self.tprint('Computing disparity... Done')
         return True
     
@@ -520,7 +574,16 @@ class DepthEstimator:
 
         return fp, flow        
 
+
     # -----------------------------------------
+    def show_noise(self):
+        "calculate noise"
+        d_std = 0 if self.imgD is None else self.compute_noiseD()
+        c_std = 0 if self.imgC is None else self.compute_noiseC()
+        
+        self.tprint(f"RS Noise : {d_std:.3f}, CV Noise : {c_std:.3f}")
+        return True
+
     def show_images_left_right(self):
         "draw left right results"
         if self.imgL is None or self.imgR is None:
@@ -648,12 +711,13 @@ class TestDepthEstimator(unittest.TestCase):
 
     def test_video_stream_opencv_advanced(self):
         "depth compute"
-        p = DepthEstimator()
+        p   = DepthEstimator()
         p.init_stream()
         ret  = False
         while not ret:
             p.read_stream()
-            p.depth_opencv_advanced()
+            ret = p.depth_opencv_advanced()
+            ret = p.show_noise()
             ret = p.show_images_depth()
 
         self.assertFalse(p.imgD is None) 
@@ -763,12 +827,12 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    #suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
+    suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
     #suite.addTest(TestDepthEstimator("test_show_flow"))
     #suite.addTest(TestDepthEstimator("test_block_matching"))
     #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence"))
-    suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
+    #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
     runner = unittest.TextTestRunner()
     runner.run(suite)
 
