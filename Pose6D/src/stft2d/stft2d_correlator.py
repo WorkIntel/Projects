@@ -285,20 +285,24 @@ class DataGenerator:
         #self.imgD = cv.normalize(frame[:,:,2], None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
         return
       
-    def init_roi(self, test_type = 1):
-        "load the test case"
-        roi = [0,0,self.frame_size[0],self.frame_size[1]]
+    
+    def init_roi(self, test_type = 0):
+        "load the roi case"
+        w,h     = self.frame_size
+        w2, h2  = w>>1, h>>1
+        roi     = [0,0,w,h]
         if test_type == 1:
-            roi = [310,230,330,250] # xlu, ylu, xrb, yrb
+            roi = [w2-3,h2-3,w2+3,h2+3] # xlu, ylu, xrb, yrb
         elif test_type == 2:
             roi = [300,220,340,260] # xlu, ylu, xrb, yrb
         elif test_type == 3:
             roi = [280,200,360,280] # xlu, ylu, xrb, yrb            
         elif test_type == 4:
             roi = [220,140,420,340] # xlu, ylu, xrb, yrb      
-        elif test_type == 4:
-            roi = [200,120,440,360] # xlu, ylu, xrb, yrb            
-        return roi 
+        elif test_type == 5:
+            roi = [200,120,440,360] # xlu, ylu, xrb, yrb     
+   
+        return roi    
     
     def show_images(self):
         "show images left and right"

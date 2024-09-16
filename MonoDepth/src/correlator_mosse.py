@@ -120,7 +120,7 @@ class MOSSE:
         self.last_img = img = cv.getRectSubPix(frame, (w, h), (x, y))
         img                 = self.preprocess(img)
         self.last_resp, (dx, dy), self.psr = self.correlate(img)
-        self.good = self.psr > 18.0
+        self.good = self.psr > 8.0
         if not self.good:
             return
 
@@ -207,8 +207,12 @@ class MOSSE:
 # Original App
 class App:
     def __init__(self, video_src, paused = False):
-        self.cap = video.create_capture(video_src)
-        _, self.frame = self.cap.read()
+        self.cap = cv.VideoCapture(video_src) #video.create_capture(video_src)
+        if self.cap is None or not self.cap.isOpened():
+            print('Warning: unable to open video source: ', video_src)
+            return
+        
+        ret, self.frame = self.cap.read()
         cv.imshow('frame', self.frame)
         self.rect_sel = RectSelector('frame', self.onrect)
         self.trackers = []
@@ -216,7 +220,7 @@ class App:
 
     def onrect(self, rect):
         frame_gray = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
-        tracker = MOSSE(frame_gray, rect)
+        tracker = MOSSE_ORIGIN(frame_gray, rect)
         self.trackers.append(tracker)
 
     def run(self):
@@ -247,10 +251,10 @@ class App:
 
 # RealSense L or R App
 class AppRS:
-    def __init__(self, video_src, paused = False):
+    def __init__(self, video_src = 'iid', paused = False):
         #self.cap = video.create_capture(video_src)
-        #self.cap        = RealSense('iid')
-        self.cap        = RealSense('ggd')
+        self.cap        = RealSense(video_src)
+        #self.cap        = RealSense('ggd')
         _, frame_c      = self.cap.read()
         self.frame      = frame_c[:,:,0]
         vis             = cv.cvtColor(self.frame, cv.COLOR_GRAY2BGR) 
@@ -293,10 +297,12 @@ class AppRS:
             if ch == ord(' '):
                 self.paused = not self.paused
             if ch == ord('c'):
-                self.trackers = []
+                self.trackers.pop()
             if ch == ord('u'):  
                 self.update_rate = 0.1 if self.update_rate < 0.001 else 0              
 
+        cv.destroyAllWindows()
+        
 if __name__ == '__main__':
     print (__doc__)
     import sys, getopt
@@ -305,8 +311,8 @@ if __name__ == '__main__':
     try:
         video_src = args[0]
     except:
-        video_src = '0'
+        video_src = 'iid'
 
-    #App(video_src, paused = '--pause' in opts).run()
+    App(0, paused = '--pause' in opts).run()
 
-    AppRS(video_src, paused = '--pause' in opts).run()
+    #AppRS(video_src, paused = '--pause' in opts).run()
