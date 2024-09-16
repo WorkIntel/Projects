@@ -153,7 +153,7 @@ class MOSSE:
         x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
         cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
         if self.good:
-            cv.circle(vis, (int(x), int(y)), 2, (0, 0, 255), -1)
+            cv.circle(vis, (int(x), int(y)), 2, (0, 255, 0), -1)
         else:
             cv.line(vis, (x1, y1), (x2, y2), (0, 0, 255))
             cv.line(vis, (x2, y1), (x1, y2), (0, 0, 255))
@@ -184,7 +184,7 @@ class MOSSE:
         z           = resp[my-search_size:my+search_size, mx-search_size:mx+search_size]
         xp, yp      = peak_fit_2d(z)
         xp, yp      = xp - search_size, yp - search_size     
-        mx, my      = mx + xp, my + yp
+        #mx, my      = mx + xp, my + yp
         #print(f"{my:.2f},{mx:.2f}: {yp:.2f},{xp:.2f}")
         print(f"{my:.2f},{mx:.2f}")
         #time.sleep(0.5)
@@ -220,7 +220,7 @@ class App:
 
     def onrect(self, rect):
         frame_gray = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
-        tracker = MOSSE_ORIGIN(frame_gray, rect)
+        tracker     = MOSSE(frame_gray, rect) #MOSSE_ORIGIN(frame_gray, rect)
         self.trackers.append(tracker)
 
     def run(self):
@@ -313,6 +313,6 @@ if __name__ == '__main__':
     except:
         video_src = 'iid'
 
-    #App(0, paused = '--pause' in opts).run()
+    App(0, paused = '--pause' in opts).run()
 
-    AppRS(video_src, paused = '--pause' in opts).run()
+    #AppRS(video_src, paused = '--pause' in opts).run()

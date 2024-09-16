@@ -66,7 +66,7 @@ def rnd_warp(a):
 def divSpec(A, B):
     Ar, Ai = A[...,0], A[...,1]
     Br, Bi = B[...,0], B[...,1]
-    C = (Ar+1j*Ai)/(Br+1j*Bi+1)
+    C = (Ar+1j*Ai)/(Br+1j*Bi)
     C = np.dstack([np.real(C), np.imag(C)]).copy()
     return C
 
@@ -162,7 +162,7 @@ class DataGenerator:
         elif img_type == 7: # same image with shift - sub region
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)[100:328, 300:528]
-            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+            self.imgR = np.roll(self.imgL, np.array([-8, -8]), axis=(0, 1))
             offset    = 32
             self.roiR = [offset, offset, offset+window_size,offset+window_size]  
 
@@ -187,7 +187,7 @@ class DataGenerator:
             image2      = image1.copy()
             offset      = 32
             rect2       = [offset, offset, offset+window_size,offset+window_size]            
-            shift       = np.array([2, 2]) * -2
+            shift       = np.array([2, 2]) *0
             image1      = np.roll(image1, shift, axis=(0, 1))  
             self.imgL, self.imgR, self.roiR = image1, image2, rect2
 
@@ -577,6 +577,248 @@ class STFT2D:
             #ptxt = 'E: STF: %s' % txt
             log.error(ptxt)  
 
+# ----------------------
+#%% Peak Tracker
+class STFT2D_ORIG:
+    def __init__(self, frame, rect):
+        x1, y1, x2, y2  = rect
+        w, h            = map(cv.getOptimalDFTSize, [x2-x1, y2-y1])
+        x1, y1          = (x1+x2-w)//2, (y1+y2-h)//2
+        self.pos = x, y = x1+0.5*(w-1), y1+0.5*(h-1)
+        self.size       = w, h
+        img             = cv.getRectSubPix(frame, (w, h), (x, y))
+        #img             = frame[y1:y2,x1:x2]
+        self.win        = cv.createHanningWindow((w, h), cv.CV_32F)
+        self.last_img   = img
+        g               = np.zeros((h, w), np.float32)
+        g[h//2, w//2]   = 1
+        g               = cv.GaussianBlur(g, (-1, -1), 2.0)
+        g              /= g.max()
+        self.G          = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
+
+        self.init_kernel(img)
+        self.update_kernel()
+        self.update(frame)
+
+    def preprocess(self, img):
+        img         = np.log(np.float32(img)+1.0)
+        img         = img-img.mean()  # important line
+        img         = img/ (img.std()+eps)  # important line
+        return img*self.win   
+
+    def subpixel_peak_offsets(self,peak_vals):
+        # deals with border
+        if peak_vals.shape[0] != 5 or peak_vals.shape[1]!=5:
+            return 0,0
+        
+        xg = np.array([[-2., -1.,  0.,  1.,  2.],       [-2., -1.,  0.,  1.,  2.],       [-2., -1.,  0.,  1.,  2.],       [-2., -1.,  0.,  1.,  2.],       [-2., -1.,  0.,  1.,  2.]])
+        yg = np.array([[-2., -2., -2., -2., -2.],       [-1., -1., -1., -1., -1.],       [ 0.,  0.,  0.,  0.,  0.],       [ 1.,  1.,  1.,  1.,  1.],       [ 2.,  2.,  2.,  2.,  2.]])
+        w  = peak_vals.sum()
+        dx = np.multiply(peak_vals,xg).sum()/w
+        dy = np.multiply(peak_vals,yg).sum()/w
+        return dx, dy
+
+    def init_kernel(self, img):
+        "instead of init in the __init__ function"
+        self.H1         = np.zeros_like(self.G)
+        self.H2         = np.zeros_like(self.G)
+        for _i in range(128): #128):
+            imgr        = rnd_warp(img)
+            a           = self.preprocess(imgr)
+            A           = cv.dft(a, flags=cv.DFT_COMPLEX_OUTPUT)
+            self.H1    += cv.mulSpectrums(self.G, A, 0, conjB=True)
+            self.H2    += cv.mulSpectrums(A, A, 0, conjB=True)
+
+    def update_kernel(self):
+        self.H          = divSpec(self.H1, self.H2)
+        self.H[...,1]  *= -1    
+        
+    def correlate(self, img):
+        A           = cv.dft(img, flags=cv.DFT_COMPLEX_OUTPUT)
+        C           = cv.mulSpectrums(A, self.H, 0, conjB=True)
+        resp        = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
+        #resp       = np.fft.fftshift(resp) # Shift the zero-frequency component to the center
+
+        h, w        = resp.shape
+        _, mval, _, (mx, my) = cv.minMaxLoc(resp)
+        side_resp   = resp.copy()
+        #cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)
+        smean, sstd = side_resp.mean(), side_resp.std()
+        psr         = (mval-smean) / (sstd+eps)
+
+        # sub pixel
+        # search_size = 3
+        # z           = resp[my-search_size:my+search_size, mx-search_size:mx+search_size]
+        # xp, yp      = peak_fit_2d(z)
+        # xp, yp      = xp - search_size, yp - search_size     
+        # mx, my      = mx + xp, my + yp
+        #print(f"{my:.2f},{mx:.2f}: {yp:.2f},{xp:.2f}")
+        #print(f"{my:.2f},{mx:.2f}")
+        #time.sleep(0.5)
+
+        # # UD  subpixel
+        # respc       = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_COMPLEX_OUTPUT)
+        # respc       = np.fft.fftshift(respc)
+        # resp        = cv.magnitude(respc[:,:,0],respc[:,:,1])   
+        # cval        = respc[my,mx,:].squeeze()
+        # angl        = np.arctan2(cval[1],cval[0])*180/np.pi
+        # print(f"{my},{mx}: {cval[0]:.2f},{cval[1]:.2f} : {angl:.2f}")
+        # side_resp = respc.copy()
+        #cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)        
+
+        return resp, (mx-w//2, my-h//2), psr    
+    
+    def update(self, frame, rate = 0.0): #125):
+        (x, y), (w, h)      = self.pos, self.size
+        img                 = cv.getRectSubPix(frame, (w, h), (x, y))
+        self.last_img       = img
+        img                 = self.preprocess(img)
+        self.last_resp, (dx, dy), self.psr = self.correlate(img)
+        self.good           = self.psr > 8.0
+        if not self.good:
+            return
+
+        self.pos            = x+dx, y+dy
+        self.last_img = img = cv.getRectSubPix(frame, (w, h), self.pos)
+        img                 = self.preprocess(img)
+        A                   = cv.dft(img, flags=cv.DFT_COMPLEX_OUTPUT)
+        H1                  = cv.mulSpectrums(self.G, A, 0, conjB=True)
+        H2                  = cv.mulSpectrums(     A, A, 0, conjB=True)
+        self.H1             = self.H1 * (1.0-rate) + H1 * rate
+        self.H2             = self.H2 * (1.0-rate) + H2 * rate
+        self.update_kernel()
+
+
+    def block_process(self, big_array: np.array):
+        """ 
+        Prforms block processing of the big array using small arrray and function provided
+        Similar to Matlab block processing function
+
+        number of rows and columns in big array must be interger multiple of the small array
+        fun - should accept two arrays of the asme size and return the same size array
+        
+        """
+        small_array = self.H
+
+        br,bc       = big_array.shape
+        sr,sc       = small_array.shape[:2]
+
+        row_num, col_num = br//sr, bc//sc
+        if not isinstance(row_num, int) or not isinstance(col_num, int):
+            raise ValueError("number of rows and columns in big array must be interger multiple of the small array")
+        
+        a1      = big_array.reshape(row_num, sr, col_num, sc).transpose(0, 2, 1, 3)
+        res1    = np.zeros(a1.shape)
+
+        for r in range(row_num):
+            for c in range(col_num):
+                img              = a1[r,c,:,:]
+                imgp             = self.preprocess(img)
+                A                = cv.dft(imgp, flags=cv.DFT_COMPLEX_OUTPUT)        
+                C                = cv.mulSpectrums(A, small_array, 0, conjB=True) #/cv.norm(A)
+                resp             = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
+                res1[r,c,:,:]    = resp #np.fft.fftshift(resp)
+                #res1[r,c,:,:]    = np.fft.fftshift(resp[:,:,0] +1j*resp[:,:,1])
+
+        res     = res1.transpose(0, 2, 1, 3).reshape(big_array.shape)
+        return res
+
+    def correlate_frame(self, frame):
+        "work on the entire frame"
+        # size of the patch
+        window_size      = self.size[0]
+
+        # Get image dimensions and number of color channels
+        n_rows, n_cols   = frame.shape
+
+        # Ensure image size is compatible with window size
+        max_row_win     = n_rows - window_size // 2
+        max_col_win     = n_cols - window_size // 2
+        if max_row_win < window_size or max_col_win < window_size:
+            raise ValueError("Image size is less than the size of the window")
+
+        # Calculate number of windows in each direction
+        row_win_num     = max_row_win // window_size
+        col_win_num     = max_col_win // window_size
+
+        # Define active pixel region
+        active_rows     = row_win_num * window_size
+        active_cols     = col_win_num * window_size
+
+        # Define translations
+        translations = np.array([[0, 0], [1, 0], [0, 1], [1, 1]]) * (window_size // 2)   
+
+        # Initialize correlation output
+        corr_result  = np.zeros((n_rows, n_cols), dtype=np.float32)
+
+        # Loop through translations and perform STFT
+        for i, translation in enumerate(translations):
+
+            image_patch    = frame[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols] #
+            corr_patch     = self.block_process(image_patch)
+            corr_result[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols] += corr_patch
+
+            # debug
+            peak_xy    = max_location(corr_patch)
+            plt.figure(20 + i)
+            plt.imshow(np.abs(corr_patch), cmap='gray')
+            plt.title('Pose y-%s, x-%s peak at %s' %(str(translation[0]),str(translation[1]),str(peak_xy)))
+            plt.colorbar() #orientation='horizontal')
+            plt.show()
+                     
+        return np.real(corr_result)
+  
+    @property
+    def state_vis(self):
+        f               = cv.idft(self.H, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT )
+        h, w            = f.shape
+        f               = np.roll(f, -h//2, 0)
+        f               = np.roll(f, -w//2, 1)
+        kernel          = np.uint8( (f-f.min()) / f.ptp()*255 )
+        resp            = self.last_resp
+        resp            = np.uint8(np.clip(resp/resp.max(), 0, 1)*255)
+        vis             = np.hstack([self.last_img, kernel, resp])
+        return vis
+
+    def draw_state(self, vis):
+        (x, y), (w, h) = self.pos, self.size
+        x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
+        cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
+        if self.good:
+            cv.circle(vis, (int(x), int(y)), 2, (0, 0, 255), -1)
+        else:
+            cv.line(vis, (x1, y1), (x2, y2), (0, 0, 255))
+            cv.line(vis, (x2, y1), (x1, y2), (0, 0, 255))
+        draw_str(vis, (x1, y2+16), 'PSR: %.2f' % self.psr)
+
+    def show_corr_image(self, correlation_image, fig_num = 31):
+        "shows the correlation image"
+        peak_xy           = max_location(np.abs(correlation_image))
+        peak_val          = np.abs(correlation_image.max())
+        txts              = 'Max val : %s, position : %s' %(str(peak_val), str(peak_xy))
+        self.tprint(txts)
+
+        # Visualize correlation
+        plt.figure(fig_num)
+        #plt.imshow(np.log10(np.abs(correlation_image)), cmap='gray')
+        plt.imshow(np.abs(correlation_image), cmap='gray')
+        #plt.title(f"Correlation Shift: {shift}")
+        plt.title(txts)
+        plt.colorbar() #orientation='horizontal')
+        plt.show()  
+
+    def tprint(self, ptxt='',level='I'):
+        
+        if level == 'I':
+            #ptxt = 'I: STF: %s' % txt
+            log.info(ptxt)  
+        if level == 'W':
+            #ptxt = 'W: STF: %s' % txt
+            log.warning(ptxt)  
+        if level == 'E':
+            #ptxt = 'E: STF: %s' % txt
+            log.error(ptxt)  
+
 
 # ----------------------
 #%% Tests
@@ -610,7 +852,7 @@ class TestSTFT2D(unittest.TestCase):
         "correlator with single image"
         w_size  = 32
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 8, window_size = w_size) # 6,7-ok
+        isOk    = d.init_image(img_type = 7, window_size = w_size) # 6,7-ok
         d.show_images()
 
         c       = STFT2D(d.imgR, d.roiR)
@@ -629,6 +871,30 @@ class TestSTFT2D(unittest.TestCase):
         img_c   = c.correlate_frame(d.imgL)
         c.show_corr_image(img_c)
         self.assertTrue(isOk)  
+
+    def test_original_corr(self):
+        "correlator with orig implementation"
+        w_size  = 32
+        d       = DataGenerator()
+        isOk    = d.init_image(img_type = 13, window_size = w_size) # 12,13 - ok
+        d.show_images()
+
+        c       = STFT2D_ORIG(d.imgR, d.roiR)
+        img_c   = c.correlate_frame(d.imgL)
+        c.show_corr_image(img_c)
+        self.assertTrue(isOk)    
+
+    def test_original_corr_single_image_with_itself(self):
+        "correlator with single image"
+        w_size  = 32
+        d       = DataGenerator()
+        isOk    = d.init_image(img_type = 7, window_size = w_size) # 6,7-ok
+        d.show_images()
+
+        c       = STFT2D_ORIG(d.imgR, d.roiR)
+        img_c   = c.correlate_frame(d.imgL)
+        c.show_corr_image(img_c)
+        self.assertTrue(isOk)               
 
 # ----------------------
 #%% App
@@ -679,10 +945,12 @@ if __name__ == '__main__':
 
     #suite.addTest(TestSTFT2D("test_stft2d_corr")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_corr_shift")) # ok
-    
-    #suite.addTest(TestSTFT2D("test_single_image_with_itself")) # ok
-    suite.addTest(TestSTFT2D("test_two_images"))
+    suite.addTest(TestSTFT2D("test_single_image_with_itself")) # ok
+    #suite.addTest(TestSTFT2D("test_two_images"))
 
+    #suite.addTest(TestSTFT2D("test_original_corr")) # ok
+    #suite.addTest(TestSTFT2D("test_original_corr_single_image_with_itself")) # nok
+ 
 
 
     runner = unittest.TextTestRunner()
