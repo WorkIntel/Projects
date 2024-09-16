@@ -140,7 +140,7 @@ class DepthEstimator:
 
                                     
         self.imgC       = self.imgD  
-        self.frame_size = self.imgD.shape[:2:-1] # w,h 
+        self.frame_size = self.imgD.shape[::-1] # w,h 
         #self.img        = np.uint8(self.img) 
 
         #self.img = self.add_noise(self.img, 0)
@@ -178,7 +178,7 @@ class DepthEstimator:
         #self.imgD = cv.normalize(frame[:,:,2], None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
         return 
       
-    def init_roi(self, test_type = 1):
+    def init_roi(self, test_type = 0):
         "load the roi case"
         w,h     = self.frame_size
         w2, h2  = w>>1, h>>1
@@ -827,12 +827,12 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_show_images_depth"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
-    suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
+    #suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
     #suite.addTest(TestDepthEstimator("test_show_flow"))
     #suite.addTest(TestDepthEstimator("test_block_matching"))
     #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence"))
-    #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
+    suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
     runner = unittest.TextTestRunner()
     runner.run(suite)
 
