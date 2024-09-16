@@ -134,7 +134,10 @@ class DataGenerator:
         elif img_type == 3:
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
-            self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE)  
+            self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE) 
+            self.imgR = np.roll(self.imgL, np.array([0, -8]), axis=(0, 1))
+            offset    = [512,256]
+            self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]             
 
         elif img_type == 4:
             self.imgD = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_029.png", cv.IMREAD_GRAYSCALE)
@@ -146,7 +149,7 @@ class DataGenerator:
             self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE))
             self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE) )     
             self.imgR = np.roll(self.imgR, np.array([0, -32]), axis=(0, 1))
-            offset    = [256,128]
+            offset    = [64,64]
             self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]                      
 
         elif img_type == 6: # same image with shift
@@ -470,9 +473,10 @@ class STFT2D:
                 img              = a1[r,c,:,:]
                 imgp             = self.preprocess(img)
                 A                = cv.dft(imgp, flags=cv.DFT_COMPLEX_OUTPUT)        
-                C                = cv.mulSpectrums(A, small_array, 0, conjB=True)
+                C                = cv.mulSpectrums(A, small_array, 0, conjB=True) #/cv.norm(A)
                 resp             = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
                 res1[r,c,:,:]    = np.fft.fftshift(resp)
+                #res1[r,c,:,:]    = np.fft.fftshift(resp[:,:,0] +1j*resp[:,:,1])
 
         res     = res1.transpose(0, 2, 1, 3).reshape(big_array.shape)
         return res
@@ -520,7 +524,7 @@ class STFT2D:
             plt.colorbar() #orientation='horizontal')
             plt.show()
                      
-        return corr_result
+        return np.real(corr_result)
   
     @property
     def state_vis(self):
@@ -618,7 +622,7 @@ class TestSTFT2D(unittest.TestCase):
         "correlator between 2 images"
         w_size  = 64
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 5, window_size = w_size) # 6,7-ok
+        isOk    = d.init_image(img_type = 3, window_size = w_size) # 5-nok
         d.show_images()
 
         c       = STFT2D(d.imgR, d.roiR)

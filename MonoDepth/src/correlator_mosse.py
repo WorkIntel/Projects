@@ -313,6 +313,6 @@ if __name__ == '__main__':
     except:
         video_src = 'iid'
 
-    App(0, paused = '--pause' in opts).run()
+    #App(0, paused = '--pause' in opts).run()
 
-    #AppRS(video_src, paused = '--pause' in opts).run()
+    AppRS(video_src, paused = '--pause' in opts).run()
