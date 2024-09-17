@@ -66,7 +66,7 @@ def rnd_warp(a):
 def divSpec(A, B):
     Ar, Ai = A[...,0], A[...,1]
     Br, Bi = B[...,0], B[...,1]
-    C = (Ar+1j*Ai)/(Br+1j*Bi)
+    C = (Ar+1j*Ai)/(Br+1j*Bi + eps)
     C = np.dstack([np.real(C), np.imag(C)]).copy()
     return C
 
@@ -135,21 +135,23 @@ class DataGenerator:
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
             self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE) 
-            self.imgR = np.roll(self.imgL, np.array([0, -8]), axis=(0, 1))
-            offset    = [512,256]
+            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+            offset    = [128,256]
             self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]             
 
         elif img_type == 4:
             self.imgD = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_029.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_031.png", cv.IMREAD_GRAYSCALE)
-            self.imgR = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE)              
+            self.imgR = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE)  
+            offset    = [128,128]
+            self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]                        
 
         elif img_type == 5:
             self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d2_Depth.png", cv.IMREAD_GRAYSCALE))
             self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE))
             self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE) )     
-            self.imgR = np.roll(self.imgR, np.array([0, -32]), axis=(0, 1))
-            offset    = [64,64]
+            self.imgR = np.roll(self.imgR, np.array([0, 0]), axis=(0, 1))
+            offset    = [256,128]
             self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]                      
 
         elif img_type == 6: # same image with shift
@@ -170,8 +172,8 @@ class DataGenerator:
             self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE))
             self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE))
             self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
-            offset    = 32
-            self.roiR = [offset, offset, offset+window_size,offset+window_size]                        
+            offset    = [40,128]
+            self.roiR = [offset[0],offset[1],offset[0]+window_size,offset[1]+window_size]                    
 
         # elif img_type == 11:  # Test patterns for correlation
         #     image_patch = np.ones((16, 16))
@@ -327,11 +329,12 @@ class STFT2D:
         img             = frame[y1:y2,x1:x2]
         self.win        = cv.createHanningWindow((w, h), cv.CV_32F)
         self.last_img   = img
-        # g               = np.zeros((h, w), np.float32)
-        # g[h//2, w//2]   = 1
-        # g               = cv.GaussianBlur(g, (-1, -1), 2.0)
-        # g              /= g.max()
-        # self.G          = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
+        g               = np.zeros((h, w), np.float32)
+        g[h//2, w//2]   = 1
+        g               = cv.GaussianBlur(g, (-1, -1), 9.0)
+        g              /= g.max()
+        #self.G          = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
+        self.G          = np.fft.fftshift(1-g)
 
         # self.H1         = np.zeros_like(self.G)
         # self.H2         = np.zeros_like(self.G)
@@ -346,7 +349,7 @@ class STFT2D:
 
         self.init_kernel(img)
         self.update_kernel()
-        self.update(frame)
+        #self.update(frame)
 
     def preprocess(self, img):
         img         = np.log(np.float32(img)+1.0)
@@ -376,7 +379,7 @@ class STFT2D:
             a           = self.preprocess(imgr)
             A           = cv.dft(a, flags=cv.DFT_COMPLEX_OUTPUT)
             #A[0,0,:]    = eps # no DC
-            #A[:,:,0],A[:,:,1] = A[:,:,0]*self.win,A[:,:,1]*self.win # no dc
+            A[:,:,0],A[:,:,1] = A[:,:,0]*self.G,A[:,:,1]*self.G # no dc
             self.H1    += A #cv.mulSpectrums(self.G, A, 0, conjB=True)
             self.H2    += cv.mulSpectrums(A, A, 0, conjB=True)
 
@@ -386,10 +389,13 @@ class STFT2D:
         
     def correlate(self, img):
         A           = cv.dft(img, flags=cv.DFT_COMPLEX_OUTPUT)
-        #A[:,:,0],A[:,:,1] = A[:,:,0]*self.win,A[:,:,1]*self.win # no dc
+        # A[:,:,0],A[:,:,1] = A[:,:,0]*self.G,A[:,:,1]*self.G # no dc
+        # A_norm      = 1/(cv.magnitude(A[:,:,0],A[:,:,1])+eps)
+        # A[:,:,0],A[:,:,1] = A[:,:,0]*A_norm,A[:,:,1]*A_norm
+
         C           = cv.mulSpectrums(A, self.H, 0, conjB=True)
         resp        = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
-        resp       = np.fft.fftshift(resp) # Shift the zero-frequency component to the center
+        resp        = np.fft.fftshift(resp) # Shift the zero-frequency component to the center
 
         h, w        = resp.shape
         _, mval, _, (mx, my) = cv.minMaxLoc(resp)
@@ -472,7 +478,10 @@ class STFT2D:
             for c in range(col_num):
                 img              = a1[r,c,:,:]
                 imgp             = self.preprocess(img)
-                A                = cv.dft(imgp, flags=cv.DFT_COMPLEX_OUTPUT)        
+                A                = cv.dft(imgp, flags=cv.DFT_COMPLEX_OUTPUT)    
+                #A[:,:,0],A[:,:,1] = A[:,:,0]*self.G,A[:,:,1]*self.G # no dc    
+                A_norm          = 1/(cv.magnitude(A[:,:,0],A[:,:,1])+eps)
+                A[:,:,0],A[:,:,1] = A[:,:,0]*A_norm,A[:,:,1]*A_norm
                 C                = cv.mulSpectrums(A, small_array, 0, conjB=True) #/cv.norm(A)
                 resp             = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
                 res1[r,c,:,:]    = np.fft.fftshift(resp)
@@ -852,7 +861,7 @@ class TestSTFT2D(unittest.TestCase):
         "correlator with single image"
         w_size  = 32
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 7, window_size = w_size) # 6,7-ok
+        isOk    = d.init_image(img_type = 8, window_size = w_size) # 6,7,8-ok
         d.show_images()
 
         c       = STFT2D(d.imgR, d.roiR)
@@ -862,9 +871,9 @@ class TestSTFT2D(unittest.TestCase):
 
     def test_two_images(self):
         "correlator between 2 images"
-        w_size  = 64
+        w_size  = 32
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 3, window_size = w_size) # 5-nok
+        isOk    = d.init_image(img_type = 3, window_size = w_size) # 4-?,5-ok
         d.show_images()
 
         c       = STFT2D(d.imgR, d.roiR)
@@ -945,8 +954,8 @@ if __name__ == '__main__':
 
     #suite.addTest(TestSTFT2D("test_stft2d_corr")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_corr_shift")) # ok
-    suite.addTest(TestSTFT2D("test_single_image_with_itself")) # ok
-    #suite.addTest(TestSTFT2D("test_two_images"))
+    #suite.addTest(TestSTFT2D("test_single_image_with_itself")) # ok
+    suite.addTest(TestSTFT2D("test_two_images"))
 
     #suite.addTest(TestSTFT2D("test_original_corr")) # ok
     #suite.addTest(TestSTFT2D("test_original_corr_single_image_with_itself")) # nok
