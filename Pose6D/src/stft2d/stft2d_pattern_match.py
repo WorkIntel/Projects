@@ -912,7 +912,7 @@ class App:
         self.cap   = RealSense()
         self.cap.change_mode('iid')
 
-        self.corr = STFT2D()
+        self.corr   = STFT2D()
 
         self.frame  = None
         self.paused = False

@@ -653,11 +653,12 @@ class TestSTFT2D(unittest.TestCase):
     def test_stft2d_two_images(self):
         "correlator of left and right random images"
         w_size  = 32
-        p       = STFT2D()
         d       = DataGenerator()
         isOk    = d.init_image(img_type = 21, window_size = w_size)
-        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size)
         d.show_images()
+
+        p       = STFT2D()
+        img_c   = p.test_stft2d_corr(d.imgL, d.imgR, window_size = w_size)
         p.show_corr_image(img_c)
         self.assertTrue(isOk)  
 
@@ -722,7 +723,6 @@ class App:
             if ch == 27:
                 break
 
-      
 # -------------------------- 
 if __name__ == '__main__':
     #print(__doc__)
@@ -733,9 +733,9 @@ if __name__ == '__main__':
     #suite.addTest(TestSTFT2D("test_stft2d")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_corr")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_corr_datagen")) # ok
-    #suite.addTest(TestSTFT2D("test_stft2d_two_images")) # ok
+    suite.addTest(TestSTFT2D("test_stft2d_two_images")) # ok
     #suite.addTest(TestSTFT2D("test_stft2d_two_real_small_images")) # ok
-    suite.addTest(TestSTFT2D("test_stft2d_two_real_images")) # 
+    #suite.addTest(TestSTFT2D("test_stft2d_two_real_images")) # 
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
