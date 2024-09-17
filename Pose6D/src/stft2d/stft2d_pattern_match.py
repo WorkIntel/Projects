@@ -525,13 +525,13 @@ class STFT2D:
             corr_patch     = self.block_process(image_patch)
             corr_result[translation[0]:translation[0]+active_rows, translation[1]:translation[1]+active_cols] += corr_patch
 
-            # debug
-            peak_xy    = max_location(np.abs(corr_patch))
-            plt.figure(20 + i)
-            plt.imshow(np.abs(corr_patch), cmap='gray')
-            plt.title('Pose y-%s, x-%s peak at %s' %(str(translation[0]),str(translation[1]),str(peak_xy)))
-            plt.colorbar() #orientation='horizontal')
-            plt.show()
+            # # debug
+            # peak_xy    = max_location(np.real(corr_patch))
+            # plt.figure(20 + i)
+            # plt.imshow(np.abs(corr_patch), cmap='gray')
+            # plt.title('Pose y-%s, x-%s peak at %s' %(str(translation[0]),str(translation[1]),str(peak_xy)))
+            # plt.colorbar() #orientation='horizontal')
+            # plt.show()
                      
         return np.real(corr_result)
   
@@ -828,7 +828,6 @@ class STFT2D_ORIG:
             #ptxt = 'E: STF: %s' % txt
             log.error(ptxt)  
 
-
 # ----------------------
 #%% Tests
 class TestSTFT2D(unittest.TestCase):
@@ -912,12 +911,42 @@ class App:
         self.cap   = RealSense()
         self.cap.change_mode('iid')
 
-        self.corr   = STFT2D()
-
+        self.corr   = None 
         self.frame  = None
         self.paused = False
 
-        cv.namedWindow('Corr')
+        self.imgL   = None
+        self.imgR   = None
+
+        self.drag_start = 0, 0
+        self.sel    = (0,0,0,0)
+
+        cv.namedWindow('Left')
+        cv.setMouseCallback("Left", self.onmouse)
+
+        cv.namedWindow('Right')
+
+    def onmouse(self, event, x, y, flags, param):
+        if event == cv.EVENT_LBUTTONDOWN:
+            self.drag_start = x, y
+            self.sel = (0,0,0,0)
+        elif event == cv.EVENT_LBUTTONUP:
+            if self.sel[2] > self.sel[0] and self.sel[3] > self.sel[1]:
+
+                img        = self.frame[:,:,0]
+                roi         = [self.sel[0], self.sel[1], self.sel[0]+32, self.sel[1]+32] #self.sel[2], self.sel[3]]
+                self.corr   = STFT2D(img, roi)
+
+            self.drag_start = None
+        elif self.drag_start:
+            print(flags)
+            if flags & cv.EVENT_FLAG_LBUTTON:
+                minpos      = min(self.drag_start[0], x), min(self.drag_start[1], y)
+                maxpos      = max(self.drag_start[0], x), max(self.drag_start[1], y)
+                self.sel    = (minpos[0], minpos[1], maxpos[0], maxpos[1])
+            else:
+                print("selection is complete")
+                self.drag_start = None        
 
     def run(self):
         while True:
@@ -928,27 +957,44 @@ class App:
                     break
                 self.frame = frame.copy()
 
-            #vis = self.frame.copy()
-            #if playing:
-            img_c   = self.corr.test_stft2d_corr(self.frame[:,:,0], self.frame[:,:,1], window_size = 16)
-                # for tr in tracked:
-                #     cv.polylines(vis, [np.int32(tr.quad)], True, (255, 255, 255), 2)
-                #     for (x, y) in np.int32(tr.p1):
-                #         cv.circle(vis, (x, y), 2, (255, 255, 255))
 
-            #self.rect_sel.draw(img_c)
-            cv.imshow('Corr', img_c)
+            if self.frame is None:
+                continue
+
+            self.imgL       = cv.cvtColor(self.frame[:,:,0], cv.COLOR_GRAY2BGR)
+            self.imgR       = cv.cvtColor(self.frame[:,:,1], cv.COLOR_GRAY2BGR) 
+
+            if self.corr is None:
+                peak_xy = (0,0)
+                
+            else:
+                img_c       = self.corr.correlate_frame(self.frame[:,:,1])
+                peak_xy     = max_location(img_c)
+                cv.imshow("Corr",  img_c)
+
+
+            self.imgL       = cv.rectangle(self.imgL, (self.sel[0], self.sel[1]), (self.sel[2], self.sel[3]), (0,255,255), 1)
+            cv.imshow("Left", self.imgL)
+           
+            self.imgR         = cv.circle(self.imgR, (peak_xy[0], peak_xy[1]), 5, (0, 255, 255), -1)
+            cv.imshow('Right', self.imgR)
+            
             ch = cv.waitKey(1)
             if ch == ord(' '):
                 self.paused = not self.paused
             if ch == 27:
                 break
 
+        cv.destroyAllWindows()
+        print('Done')
+
+
       
 # -------------------------- 
 if __name__ == '__main__':
     #print(__doc__)
 
+    """
      #unittest.main()
     suite = unittest.TestSuite()
 
@@ -959,12 +1005,13 @@ if __name__ == '__main__':
 
     #suite.addTest(TestSTFT2D("test_original_corr")) # ok
     #suite.addTest(TestSTFT2D("test_original_corr_single_image_with_itself")) # nok
- 
-
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
-
+    """
+    
+    App().run()
+    
 
 
     
