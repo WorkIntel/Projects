@@ -7,15 +7,16 @@ OpenCV like wrapper for Real Sense Camera
 Allows to read, display store video and images of RGB - Depth combinations in different formats.  
 Can extract left and right IR images.
 Aligns RGB and Depth data.
-
-
+Can save data as mp4 or single images
 
 Usage:
     python opencv_realsense_camera.py 
     will run the camera and open the image window with live stream.
     Use keys outlines in test() function to switch different modes
     Press 's' to save the current image
+    Press 't' to save the left and right images in separate files
     Press 'r' to start recording and one more time 'r' to stop video recording
+    
                                         
 
 Environment : 
@@ -33,10 +34,11 @@ import cv2 as cv
 class RealSense(object):
     def __init__(self,  mode = 'rgb', use_ir = True, **params):
         
-        self.frame_size = (640,480) #(1280, 720)#
-        self.count      = 0
-        self.mode       = 'rgb' if mode is None else mode 
-        self.use_ir     = False if use_ir is None else use_ir
+        self.frame_size     = (640,480) #(1280, 720)#
+        self.count          = 0
+        self.mode           = 'rgb' if mode is None else mode 
+        self.use_ir         = False if use_ir is None else use_ir
+        self.use_projector  = False
 
         # Configure depth and color streams
         self.pipeline = rs.pipeline()
@@ -58,9 +60,15 @@ class RealSense(object):
             pipeline_profile = self.config.resolve(pipeline_wrapper)
             device = pipeline_profile.get_device()
             device_product_line = str(device.get_info(rs.camera_info.product_line))
+            device_name = device.get_info(rs.camera_info.name)
+            print('Device name : ', device_name)
             print('Device product line : ', device_product_line)
-        except:
+        except Exception as e:
             print('Real Sense new version - possibly will require a new driver version')
+            print(e)
+
+
+
 
         #found_rgb = False
         # for s in device.sensors:
@@ -84,9 +92,19 @@ class RealSense(object):
         depth_scale     = depth_sensor.get_depth_scale()
         print("Depth Scale is: " , depth_scale)
 
-        # turn emitter on-off
-        if device_product_line != 'D400':
-            depth_sensor.set_option(rs.option.emitter_enabled, 0)
+        # # turn emitter on-off
+        # if device_product_line != 'D400':
+        #     depth_sensor.set_option(rs.option.emitter_enabled, 0)
+        # check features
+        has_projector   = device_name.find('D455') > 0
+        if not has_projector:
+            print('Camera without projector')
+        else:
+            if self.use_projector is False:
+                depth_sensor.set_option(rs.option.emitter_always_on, False)
+                depth_sensor.set_option(rs.option.emitter_enabled, False)
+                
+            print('Camera projector : %s' %str(self.use_projector))        
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -102,7 +120,7 @@ class RealSense(object):
         pass
 
     def change_mode(self, mode = 'rgb'):
-        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2']):
+        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2','iig']):
              print(f'Not supported mode = {mode}')
                
         self.mode = mode  
@@ -150,23 +168,25 @@ class RealSense(object):
             ir_right    = aligned_frames.get_infrared_frame(2)
             irr_image   = np.asanyarray(ir_right.get_data())
         else:
-            print('Enable IR use at the start. use_ir = True')    
+            #print('Enable IR use at the start. use_ir = True')    
+            irl_image   = color_image[:,:,0]
+            irr_image   = color_image[:,:,1]
             image_out   = color_image            
 
         if self.mode == 'rgb':
-            image_out = color_image
+            image_out       = color_image
         elif self.mode == 'ddd':
-            image_out = depth_colormap
+            image_out       = depth_colormap
         elif self.mode == 'rgd':
-            image_out = np.concatenate((color_image[:,:,:2], depth_scaled[:,:,np.newaxis] ), axis = 2)
+            image_out       = np.concatenate((color_image[:,:,:2], depth_scaled[:,:,np.newaxis] ), axis = 2)
         elif self.mode == 'gd':
-            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out = np.concatenate((gray_image, depth_scaled ), axis = 1)
+            gray_image      = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+            image_out       = np.concatenate((gray_image, depth_scaled ), axis = 1)
         elif self.mode == 'ggd':
-            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out   = np.stack((gray_image, gray_image, depth_scaled ), axis = 2)            
+            gray_image      = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+            image_out       = np.stack((gray_image, gray_image, depth_scaled ), axis = 2)            
         elif self.mode == 'gdd':
-            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
+            gray_image      = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
             image_out       = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
         elif self.mode == 'scl':
             depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.05)
@@ -175,11 +195,11 @@ class RealSense(object):
             depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
             image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)    
         elif self.mode == 'ii2':
-            if self.use_ir:
-                image_out   = np.concatenate((irl_image, irr_image), axis = 1)  
+            image_out       = np.concatenate((irl_image, irr_image), axis = 1)  
         elif self.mode == 'iid':
-            if self.use_ir:
-                image_out   = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
+            image_out       = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
+        elif self.mode == 'iig':
+            image_out       = np.stack((irl_image, irr_image, color_image[:,:,1]), axis = 2)                  
         elif self.mode == 'dep':
             image_out  = depth_image                    
         return True, image_out
@@ -208,39 +228,9 @@ class RealSense(object):
         depth_colormap_dim = depth_colormap.shape
         color_colormap_dim = color_image.shape
 
-        #If depth and color resolutions are different, resize color image to match depth image for display
-        if depth_colormap_dim != color_colormap_dim:
-            color_image = cv.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]), interpolation=cv.INTER_AREA)
-            #images = np.hstack((resized_color_image, depth_colormap))
-        # else:
-        #     images = np.hstack((color_image, depth_colormap))
-
-        # images = color_image
-
-        if self.mode == 'rgb':
-            image_out = color_image
-        elif self.mode == 'ddd':
-            image_out = depth_colormap
-        elif self.mode == 'rgd':
-            image_out = np.concatenate((color_image[:,:,:2], depth_scaled[:,:,np.newaxis] ), axis = 2)
-        elif self.mode == 'gd':
-            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out = np.concatenate((gray_image, depth_scaled ), axis = 1)
-        elif self.mode == 'ggd':
-            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out = np.stack((gray_image, gray_image, depth_scaled ), axis = 2)            
-        elif self.mode == 'gdd':
-            gray_image  = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
-            image_out = np.stack((gray_image, depth_scaled, depth_scaled ), axis = 2) 
-        elif self.mode == 'scl':
-            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.05)
-            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)  
-        elif self.mode == 'sc2':
-            depth_scaled    = cv.convertScaleAbs(depth_image, alpha=0.1)
-            image_out       = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)                
-        elif self.mode == 'dep':
-            image_out  = depth_image                    
+        image_out  = depth_image 
         return True, image_out
+
 
     def isOpened(self):
         "OpenCV compatability"
@@ -251,6 +241,14 @@ class RealSense(object):
         cv.imwrite(fn, frame)
         print(fn, 'saved')
         self.count += 1   
+
+    def save_two_images(self, frame):
+        fl = '.\\imageL_%s_%03d.png' % (self.mode, self.count)
+        cv.imwrite(fl, frame[:,:,0])
+        fr = '.\\imageR_%s_%03d.png' % (self.mode, self.count)
+        cv.imwrite(fr, frame[:,:,1])
+        print('Saving %s and %s' %(fl,fr))
+        self.count += 1          
 
     def record_video(self, frame):
         # record video to a file is switched on
@@ -284,9 +282,9 @@ class RealSense(object):
     def show_image(self, frame):
         "show image on opencv window"
         do_exit = False
-        cv.imshow('frame (c,a,d,1,2,g,s,f,h,i,o,r: q - to exit)', frame)
+        cv.imshow('frame (c,a,d,1,2,g,s,t,f,h,i,o,p,r: q - to exit)', frame)
         ch = cv.waitKey(1) & 0xff
-        if ch == ord('q'):
+        if ch == ord('q') or ch == 27:
             do_exit = True 
         elif ch == ord('c'): # regular RGB image
             self.change_mode('rgb')
@@ -308,14 +306,19 @@ class RealSense(object):
             self.change_mode('ii2') 
         elif ch == ord('o'):
             self.change_mode('iid') 
+        elif ch == ord('p'):
+            self.change_mode('iig')            
         elif ch == ord('h'):
             self.change_mode('dep')                 
         elif ch == ord('s'):
             self.save_image(frame) 
+        elif ch == ord('t'):
+            self.save_two_images(frame)             
         elif ch == ord('r'):
             self.record_on = not self.record_on
             print('Video record %s' %str(self.record_on))
-
+        elif ch != 255:
+            print('unrecognized key - check your language setttings on the keyboard, must be English.')
         return do_exit
           
 
