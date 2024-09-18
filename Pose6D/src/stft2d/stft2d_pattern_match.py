@@ -50,6 +50,17 @@ def max_location(a):
     "position in 2d array"
     return unravel_index(a.argmax(), a.shape)
 
+def max_location_2d(img, threshold   = 0.8):
+    "multiple maxima index: img - scaled 0-1 2d array"
+
+    peak_bool   = img >= threshold   
+    translations = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]]) 
+    for i, shift in enumerate(translations):    
+        shift_bool  = np.roll(img, shift, axis=(0, 1)) <= img 
+        peak_bool   = np.logical_and(peak_bool, shift_bool)
+
+    peak_xy     = np.where(peak_bool)
+    return peak_xy
 
 def rnd_warp(a):
     h, w        = a.shape[:2]
@@ -331,7 +342,7 @@ class STFT2D:
         self.last_img   = img
         g               = np.zeros((h, w), np.float32)
         g[h//2, w//2]   = 1
-        g               = cv.GaussianBlur(g, (-1, -1), 9.0)
+        g               = cv.GaussianBlur(g, (-1, -1), 2.0)
         g              /= g.max()
         #self.G          = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
         self.G          = np.fft.fftshift(1-g)
@@ -914,6 +925,7 @@ class App:
         self.corr   = None 
         self.frame  = None
         self.paused = False
+        self.use_template = True
 
         self.imgL   = None
         self.imgR   = None
@@ -929,24 +941,44 @@ class App:
     def onmouse(self, event, x, y, flags, param):
         if event == cv.EVENT_LBUTTONDOWN:
             self.drag_start = x, y
-            self.sel = (0,0,0,0)
+            self.sel        = (0,0,0,0)
         elif event == cv.EVENT_LBUTTONUP:
-            if self.sel[2] > self.sel[0] and self.sel[3] > self.sel[1]:
-
-                img        = self.frame[:,:,0]
-                roi         = [self.sel[0], self.sel[1], self.sel[0]+32, self.sel[1]+32] #self.sel[2], self.sel[3]]
-                self.corr   = STFT2D(img, roi)
-
-            self.drag_start = None
+            self.drag_start = (-1,-1)
         elif self.drag_start:
-            print(flags)
+            #print(flags)
             if flags & cv.EVENT_FLAG_LBUTTON:
                 minpos      = min(self.drag_start[0], x), min(self.drag_start[1], y)
                 maxpos      = max(self.drag_start[0], x), max(self.drag_start[1], y)
                 self.sel    = (minpos[0], minpos[1], maxpos[0], maxpos[1])
             else:
                 print("selection is complete")
-                self.drag_start = None        
+                self.drag_start = None  
+
+    def onmouse_old(self, event, x, y, flags, param):
+        if event == cv.EVENT_LBUTTONDOWN:
+            self.drag_start = x, y
+            self.sel = (0,0,0,0)
+        elif event == cv.EVENT_LBUTTONUP:
+            if self.sel[2] > self.sel[0] and self.sel[3] > self.sel[1]:
+                patch = self.gray[self.sel[1]:self.sel[3], self.sel[0]:self.sel[2]]
+                result = cv.matchTemplate(self.gray, patch, cv.TM_CCOEFF_NORMED)
+                result = np.abs(result)**3
+                _val, result = cv.threshold(result, 0.01, 0, cv.THRESH_TOZERO)
+                result8 = cv.normalize(result, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)
+                cv.imshow("result", result8)
+            self.drag_start = None
+        elif self.drag_start:
+            #print flags
+            if flags & cv.EVENT_FLAG_LBUTTON:
+                minpos = min(self.drag_start[0], x), min(self.drag_start[1], y)
+                maxpos = max(self.drag_start[0], x), max(self.drag_start[1], y)
+                self.sel = (minpos[0], minpos[1], maxpos[0], maxpos[1])
+                img = cv.cvtColor(self.gray, cv.COLOR_GRAY2BGR)
+                cv.rectangle(img, (self.sel[0], self.sel[1]), (self.sel[2], self.sel[3]), (0,255,255), 1)
+                cv.imshow("gray", img)
+            else:
+                print("selection is complete")
+                self.drag_start = None                      
 
     def run(self):
         while True:
@@ -961,24 +993,47 @@ class App:
             if self.frame is None:
                 continue
 
+            self.gray       = self.frame[:,:,0]
             self.imgL       = cv.cvtColor(self.frame[:,:,0], cv.COLOR_GRAY2BGR)
             self.imgR       = cv.cvtColor(self.frame[:,:,1], cv.COLOR_GRAY2BGR) 
 
+            # start correlator when drag is finished
+            if self.drag_start is not None:
+                if self.drag_start[0] < 0: # finish drag
+                    if self.sel[2] > self.sel[0] and self.sel[3] > self.sel[1]:
+
+                        img         = self.frame[:,:,0]
+                        roi         = [self.sel[0], self.sel[1], self.sel[0]+32, self.sel[1]+32] #self.sel[2], self.sel[3]]
+                        self.corr   = STFT2D(img, roi)                
+
             if self.corr is None:
-                peak_xy = (0,0)
-                
-            else:
+                peak_xy = (0,0)     
+
+            elif self.use_template is False:
                 img_c       = self.corr.correlate_frame(self.frame[:,:,1])
                 peak_xy     = max_location(img_c)
                 cv.imshow("Corr",  img_c)
+
+            else:
+                template    = self.corr.last_img  
+                res         = cv.matchTemplate(self.frame[:,:,1],template,cv.TM_CCOEFF_NORMED)
+                threshold   = 0.8
+                peak_xy     = max_location_2d(res, threshold)
+                h,w         = template.shape
+                for pt in zip(*peak_xy[::-1]):
+                    self.imgR = cv.rectangle(self.imgR, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
+
 
 
             self.imgL       = cv.rectangle(self.imgL, (self.sel[0], self.sel[1]), (self.sel[2], self.sel[3]), (0,255,255), 1)
             cv.imshow("Left", self.imgL)
            
-            self.imgR         = cv.circle(self.imgR, (peak_xy[0], peak_xy[1]), 5, (0, 255, 255), -1)
+            if not self.use_template:
+                self.imgR         = cv.circle(self.imgR, (peak_xy[0], peak_xy[1]), 5, (0, 255, 255), -1)
             cv.imshow('Right', self.imgR)
-            
+
+
+
             ch = cv.waitKey(1)
             if ch == ord(' '):
                 self.paused = not self.paused
