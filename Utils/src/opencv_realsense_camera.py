@@ -41,8 +41,8 @@ class RealSense(object):
         self.use_projector  = False
 
         # Configure depth and color streams
-        self.pipeline = rs.pipeline()
-        self.config   = rs.config()
+        self.pipeline       = rs.pipeline()
+        self.config         = rs.config()
 
         self.config.enable_stream(rs.stream.depth, self.frame_size[0], self.frame_size[1], rs.format.z16, 30)
         self.config.enable_stream(rs.stream.color, self.frame_size[0], self.frame_size[1], rs.format.bgr8, 30)

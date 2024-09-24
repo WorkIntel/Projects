@@ -356,8 +356,8 @@ class PlaneDetector:
         cv.imshow('Image & Planes', img_show)
         self.tprint('show done')
         ch = cv.waitKey(5)      
-
-        return True  
+        ret = ch == 27
+        return ret  
     
     def show_2d_planes(self, results):
         "convert results to plances andd colors"
@@ -491,6 +491,8 @@ class TestPlaneDetector(unittest.TestCase):
             points  = p.preprocess_points(p.points)
             results = p.fit_planes(points)
             ret     = p.show_image_with_planes(imgc[:,:,0], results)
+            if ret:
+                break
 
         p.close()
         c.close()
