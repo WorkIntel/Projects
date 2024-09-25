@@ -53,7 +53,7 @@ def max_location(a):
 def max_location_2d(img, threshold   = 0.8):
     "multiple maxima index: img - scaled 0-1 2d array"
 
-    peak_bool   = img >= threshold   
+    peak_bool   = img >= (img.max() * threshold) 
     translations = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]]) 
     for i, shift in enumerate(translations):    
         shift_bool  = np.roll(img, shift, axis=(0, 1)) <= img 
@@ -150,12 +150,21 @@ class DataGenerator:
             offset    = [128,256]
             self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]             
 
-        elif img_type == 4:
-            self.imgD = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_029.png", cv.IMREAD_GRAYSCALE)
-            self.imgL = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_031.png", cv.IMREAD_GRAYSCALE)
-            self.imgR = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE)  
-            offset    = [128,128]
+        elif img_type == 44:
+            self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_029.png", cv.IMREAD_GRAYSCALE))
+            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE))
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_031.png", cv.IMREAD_GRAYSCALE) ) 
+            self.imgR = np.roll(self.imgR, np.array([0, 0]), axis=(0, 1))
+            offset    = [256,128]
             self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]                        
+
+        elif img_type == 4:
+            self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d2_Depth.png", cv.IMREAD_GRAYSCALE))
+            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE))
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE) )     
+            self.imgR = np.roll(self.imgR, np.array([0, 32]), axis=(0, 1))
+            offset    = [128,64]
+            self.roiR = [offset[0], offset[1], offset[0]+window_size,offset[1]+window_size]  
 
         elif img_type == 5:
             self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d2_Depth.png", cv.IMREAD_GRAYSCALE))
@@ -184,7 +193,21 @@ class DataGenerator:
             self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE))
             self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
             offset    = [40,128]
-            self.roiR = [offset[0],offset[1],offset[0]+window_size,offset[1]+window_size]                    
+            self.roiR = [offset[0],offset[1],offset[0]+window_size,offset[1]+window_size]      
+
+        elif img_type == 9: # from camera
+            self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\imageL_iig_000.png", cv.IMREAD_GRAYSCALE))
+            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\imageR_iig_000.png", cv.IMREAD_GRAYSCALE))
+            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+            offset    = [430, 462] #[64,64]
+            self.roiR = [offset[0],offset[1],offset[0]+window_size,offset[1]+window_size] 
+
+        elif img_type == 10: # from camera
+            self.imgD = cv.imread(r"C:\Data\Corr\imageL_iig_000.png", cv.IMREAD_GRAYSCALE)
+            self.imgL = cv.imread(r"C:\Data\Corr\imageR_iig_000.png", cv.IMREAD_GRAYSCALE)
+            self.imgR = np.roll(self.imgL, np.array([0, 0]), axis=(0, 1))
+            offset    = [400, 64] #[64,64]
+            self.roiR = [offset[0],offset[1],offset[0]+window_size,offset[1]+window_size]                                         
 
         # elif img_type == 11:  # Test patterns for correlation
         #     image_patch = np.ones((16, 16))
@@ -346,6 +369,7 @@ class STFT2D:
         g              /= g.max()
         #self.G          = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
         self.G          = np.fft.fftshift(1-g)
+        self.frame      = None   # holds the correlation frame
 
         # self.H1         = np.zeros_like(self.G)
         # self.H2         = np.zeros_like(self.G)
@@ -491,7 +515,7 @@ class STFT2D:
                 imgp             = self.preprocess(img)
                 A                = cv.dft(imgp, flags=cv.DFT_COMPLEX_OUTPUT)    
                 #A[:,:,0],A[:,:,1] = A[:,:,0]*self.G,A[:,:,1]*self.G # no dc    
-                A_norm          = 1/(cv.magnitude(A[:,:,0],A[:,:,1])+eps)
+                A_norm          = 1/(cv.magnitude(A[:,:,0],A[:,:,1])+eps)*self.G
                 A[:,:,0],A[:,:,1] = A[:,:,0]*A_norm,A[:,:,1]*A_norm
                 C                = cv.mulSpectrums(A, small_array, 0, conjB=True) #/cv.norm(A)
                 resp             = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
@@ -544,6 +568,7 @@ class STFT2D:
             # plt.colorbar() #orientation='horizontal')
             # plt.show()
                      
+        self.frame = frame
         return np.real(corr_result)
   
     @property
@@ -584,6 +609,30 @@ class STFT2D:
         plt.title(txts)
         plt.colorbar() #orientation='horizontal')
         plt.show()  
+
+    def show_match(self, correlation_image, fig_num = 41):
+        "shows the cmatching pattern"
+        peak_xy     = max_location_2d(correlation_image, 0.9)
+        img_r       = self.last_img
+        h,w         = img_r.shape
+        frame_gray  = self.frame.copy()
+        frame_gray[:h,:w] = img_r
+
+        img_l       = cv.cvtColor(frame_gray, cv.COLOR_GRAY2BGR)  
+        img_l       = cv.rectangle(img_l, (0,0), (w, h), (0,255,0), 1)
+        for pt in zip(*peak_xy[::-1]):
+            x,y   = pt[0] - (w >> 1), pt[1] - (h >> 1)
+            img_l = cv.rectangle(img_l, (x,y), (x + w, y + h), (0,0,255), 1)
+        
+
+        # Visualize correlation
+        plt.figure(fig_num)
+        #plt.imshow(np.log10(np.abs(correlation_image)), cmap='gray')
+        plt.imshow(img_l, cmap='gray')
+        #plt.title(f"Correlation Shift: {shift}")
+        plt.title(len(peak_xy))
+        plt.colorbar() #orientation='horizontal')
+        #plt.show()          
 
     def tprint(self, ptxt='',level='I'):
         
@@ -881,14 +930,17 @@ class TestSTFT2D(unittest.TestCase):
 
     def test_two_images(self):
         "correlator between 2 images"
-        w_size  = 32
+        w_size  = 64
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 3, window_size = w_size) # 4-?,5-ok
+        isOk    = d.init_image(img_type = 10, window_size = w_size) # 4-ok,5-ok, 44
         d.show_images()
 
         c       = STFT2D(d.imgR, d.roiR)
         img_c   = c.correlate_frame(d.imgL)
+                
+        c.show_match(img_c)
         c.show_corr_image(img_c)
+
         self.assertTrue(isOk)  
 
     def test_original_corr(self):
@@ -925,12 +977,12 @@ class App:
         self.corr   = None 
         self.frame  = None
         self.paused = False
-        self.use_template = True
+        self.use_template = False
 
         self.imgL   = None
         self.imgR   = None
 
-        self.drag_start = 0, 0
+        self.drag_start =  (-1,-1)
         self.sel    = (0,0,0,0)
 
         cv.namedWindow('Left')
@@ -944,15 +996,16 @@ class App:
             self.sel        = (0,0,0,0)
         elif event == cv.EVENT_LBUTTONUP:
             self.drag_start = (-1,-1)
-        elif self.drag_start:
+        elif self.drag_start[0] >= 0:
             #print(flags)
             if flags & cv.EVENT_FLAG_LBUTTON:
                 minpos      = min(self.drag_start[0], x), min(self.drag_start[1], y)
                 maxpos      = max(self.drag_start[0], x), max(self.drag_start[1], y)
                 self.sel    = (minpos[0], minpos[1], maxpos[0], maxpos[1])
+                #self.drag_start = None
             else:
-                print("selection is complete")
-                self.drag_start = None  
+                #print("selection is complete")
+                self.drag_start =  (0,0)  
 
     def onmouse_old(self, event, x, y, flags, param):
         if event == cv.EVENT_LBUTTONDOWN:
@@ -1004,15 +1057,21 @@ class App:
 
                         img         = self.frame[:,:,0]
                         roi         = [self.sel[0], self.sel[1], self.sel[0]+32, self.sel[1]+32] #self.sel[2], self.sel[3]]
-                        self.corr   = STFT2D(img, roi)                
+                        self.corr   = STFT2D(img, roi)  
+                        print("Correlator init %s" %str(roi)) 
+                        self.drag_start =  (0,0)             
 
             if self.corr is None:
                 peak_xy = (0,0)     
 
             elif self.use_template is False:
                 img_c       = self.corr.correlate_frame(self.frame[:,:,1])
-                peak_xy     = max_location(img_c)
-                cv.imshow("Corr",  img_c)
+                peak_xy     = max_location_2d(img_c, 0.9)
+                h,w         = self.corr.last_img.shape
+                for pt in zip(*peak_xy[::-1]):
+                    x,y     = pt[0] - (w >> 1), pt[1] - (h >> 1)
+                    self.imgR = cv.rectangle(self.imgR, (x,y), (x + w, y + h), (0,0,255), 1)
+                #cv.imshow("Corr",  img_c)
 
             else:
                 template    = self.corr.last_img  
@@ -1021,17 +1080,15 @@ class App:
                 peak_xy     = max_location_2d(res, threshold)
                 h,w         = template.shape
                 for pt in zip(*peak_xy[::-1]):
-                    self.imgR = cv.rectangle(self.imgR, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
-
+                    self.imgR = cv.rectangle(self.imgR, pt, (pt[0] + w, pt[1] + h), (0,0,255), 1)
 
 
             self.imgL       = cv.rectangle(self.imgL, (self.sel[0], self.sel[1]), (self.sel[2], self.sel[3]), (0,255,255), 1)
             cv.imshow("Left", self.imgL)
            
-            if not self.use_template:
-                self.imgR         = cv.circle(self.imgR, (peak_xy[0], peak_xy[1]), 5, (0, 255, 255), -1)
+            #if not self.use_template:
+            #    self.imgR         = cv.circle(self.imgR, (peak_xy[0], peak_xy[1]), 5, (0, 255, 255), -1)
             cv.imshow('Right', self.imgR)
-
 
 
             ch = cv.waitKey(1)
@@ -1042,14 +1099,13 @@ class App:
 
         cv.destroyAllWindows()
         print('Done')
-
-
-      
+ 
 # -------------------------- 
 if __name__ == '__main__':
     #print(__doc__)
 
-    """
+    """   
+    
      #unittest.main()
     suite = unittest.TestSuite()
 
@@ -1063,9 +1119,12 @@ if __name__ == '__main__':
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
+
     """
     
+    """ running real app"""
     App().run()
+
     
 
 
