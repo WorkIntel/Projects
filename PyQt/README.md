@@ -43,19 +43,30 @@ We are using PySide6 and opencv contributions to develop the applications.
 
     pip install PySide6
 
-7. Install QtGraph:
+7. Install QtGraph and OpenGL:
 
-    pip install  pyqtgraph
+    pip install pyqtgraph
+    pip install pyopengl
+
+
 
 
 
 # Usage
 
-In the command line : 
+In the command line to see the examples : 
 ```
-(qtgui) ... > python .\trial\pyqt_example1.py
+(qtgui)> python -m pyqtgraph.examples
 
 ```
+![](doc/QtExamples.png)
+
+or 
+```
+(qtgui)> python .\trial\pyqt_example1.py
+
+```
+
 result 
 
 ![](doc/example1.png)
