@@ -1,30 +1,23 @@
-from PySide6 import QtWidgets  # Should work with PyQt5 / PySide2 / PySide6 as well
-import pyqtgraph as pg
 
-# Always start by initializing Qt (only once per application)
-app = QtWidgets.QApplication([])
+from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtCore import Qt
 
-# Define a top-level widget to hold everything
-w = QtWidgets.QWidget()
-w.setWindowTitle('PyQtGraph example')
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        # Set the Title of the window
+        self.setWindowTitle('Mouse and Keyboard Event Demo')
+        # Set the position and size of the window
+        self.setGeometry(100, 100, 400, 300)
 
-# Create some widgets to be placed inside
-btn = QtWidgets.QPushButton('press me')
-text = QtWidgets.QLineEdit('enter text')
-listWidget = QtWidgets.QListWidget()
-plot = pg.PlotWidget()
+    # This method checks if the left mouse button was pressed on the widget
+    # and prints the position of the click.
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            print("Left mouse button pressed at:", event.position())
 
-# Create a grid layout to manage the widgets size and position
-layout = QtWidgets.QGridLayout()
-w.setLayout(layout)
-
-# Add widgets to the layout in their proper positions
-layout.addWidget(btn, 0, 0)  # button goes in upper-left
-layout.addWidget(text, 1, 0)  # text edit goes in middle-left
-layout.addWidget(listWidget, 2, 0)  # list widget goes in bottom-left
-layout.addWidget(plot, 0, 1, 3, 1)  # plot goes on right side, spanning 3 rows
-# Display the widget as a new window
-w.show()
-
-# Start the Qt event loop
-app.exec()  # or app.exec_() for PyQt5 / PySide2
+# Initialize the QApplication
+app = QApplication([])
+window = MainWindow()
+window.show()
+app.exec()  # Start the event loop

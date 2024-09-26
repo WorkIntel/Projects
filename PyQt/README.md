@@ -8,8 +8,8 @@
 This code provides examples of the using RealSense camera and PyQT GUI applications.
 The following examples are:
 
--   Barcodes, QR Codes : detected by using  external library
--   ArucoMarkers : using OpenCV
+-   How to create a simple QT applications
+-   Integrate it with OpenCV and Real Sense
 
 These examples could be integrated in your application and video processing pipe line.
 
@@ -53,7 +53,7 @@ We are using PySide6 and opencv contributions to develop the applications.
 
 In the command line : 
 ```
-python .\trial\pyqt_example1.py
+(qtgui) ... > python .\trial\pyqt_example1.py
 
 ```
 result 
