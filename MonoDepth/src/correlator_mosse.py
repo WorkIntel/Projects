@@ -186,7 +186,7 @@ class MOSSE:
         xp, yp      = xp - search_size, yp - search_size     
         #mx, my      = mx + xp, my + yp
         #print(f"{my:.2f},{mx:.2f}: {yp:.2f},{xp:.2f}")
-        print(f"{my:.2f},{mx:.2f}")
+        #print(f"{my:.2f},{mx:.2f}")
         #time.sleep(0.5)
 
         # # UD  subpixel
@@ -218,8 +218,18 @@ class App:
         self.trackers = []
         self.paused = paused
 
+    def get_frame_gray(self, frame_type = 0):
+        "extracts gray frame"
+        if frame_type == 0:
+            frame_gray = self.frame[:,:,0]
+        elif frame_type == 1:
+            frame_gray = self.frame[:,:,1]            
+        else:
+            frame_gray = cv.cvtColor(self.frame)
+        return frame_gray 
+
     def onrect(self, rect):
-        frame_gray = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+        frame_gray  = self.get_frame_gray(0)
         tracker     = MOSSE(frame_gray, rect) #MOSSE_ORIGIN(frame_gray, rect)
         self.trackers.append(tracker)
 
@@ -229,7 +239,7 @@ class App:
                 ret, self.frame = self.cap.read()
                 if not ret:
                     break
-                frame_gray = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+                frame_gray  = self.get_frame_gray(1)
                 for tracker in self.trackers:
                     tracker.update(frame_gray)
 
@@ -255,21 +265,36 @@ class AppRS:
         #self.cap = video.create_capture(video_src)
         self.cap        = RealSense(video_src)
         #self.cap        = RealSense('ggd')
-        _, frame_c      = self.cap.read()
-        self.frame      = frame_c[:,:,0]
-        vis             = cv.cvtColor(self.frame, cv.COLOR_GRAY2BGR) 
-        cv.imshow('frame', vis)
-        self.rect_sel   = RectSelector('frame', self.onrect)
-        self.trackers   = []
+        _, self.frame   = self.cap.read()
+        frame_gray      = self.get_frame_gray(0)
+        vis             = cv.cvtColor(frame_gray, cv.COLOR_GRAY2BGR) 
+        cv.imshow('frame left', vis)
+        cv.imshow('frame right', vis)
+        self.rect_sel   = RectSelector('frame left', self.onrect)
+        self.trackers_l = []
+        self.trackers_r = []
         self.paused     = paused
         self.update_rate= 0
 
+    def get_frame_gray(self, frame_type = 0):
+        "extracts gray frame"
+        if frame_type == 0:
+            frame_gray = self.frame[:,:,0]
+        elif frame_type == 1:
+            frame_gray = self.frame[:,:,1]            
+        else:
+            frame_gray = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+        return frame_gray       
+
     def onrect(self, rect):
-        frame_gray      = self.frame #cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+        #frame_gray      = self.frame #cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+        frame_gray      = self.get_frame_gray(0)
         tracker         = MOSSE(frame_gray, rect)
         #tracker         = MOSSE_ORIGIN(frame_gray, rect)
-        
-        self.trackers.append(tracker)
+        self.trackers_l.append(tracker)
+        #frame_gray      = self.get_frame_gray(1)
+        tracker         = MOSSE(frame_gray, rect)
+        self.trackers_r.append(tracker)        
 
     def run(self):
         while True:
@@ -277,27 +302,41 @@ class AppRS:
                 ret, frame_c = self.cap.read()
                 if not ret:
                     break
-                self.frame = frame_c[:,:,0]
-                frame_gray = self.frame
-                for tracker in self.trackers:
-                    tracker.update(frame_gray, rate = self.update_rate)
+                self.frame  = frame_c #[:,:,0]
 
+            frame_gray  = self.get_frame_gray(0)
+            for tracker in self.trackers_l:
+                tracker.update(frame_gray, rate = self.update_rate) 
+
+            frame_gray  = self.get_frame_gray(1)
+            for tracker in self.trackers_r:
+                tracker.update(frame_gray, rate = self.update_rate)
+                # search for the match pattern in x direction - disrepancy is big
+                if not tracker.good and tracker.pos[0] > tracker.size[0]:
+                    tracker.pos = (tracker.pos[0] - 1, tracker.pos[1])
             
-            vis = cv.cvtColor(self.frame, cv.COLOR_GRAY2BGR) 
-            for tracker in self.trackers:
-                tracker.draw_state(vis)
-            if len(self.trackers) > 0:
-                cv.imshow('tracker state', self.trackers[-1].state_vis)
-            self.rect_sel.draw(vis)
+            vis_l = cv.cvtColor(self.frame[:,:,0], cv.COLOR_GRAY2BGR) 
+            for tracker in self.trackers_l:
+                tracker.draw_state(vis_l)
 
-            cv.imshow('frame', vis)
+            vis_r = cv.cvtColor(self.frame[:,:,1], cv.COLOR_GRAY2BGR) 
+            for tracker in self.trackers_r:
+                tracker.draw_state(vis_r)                
+
+            if len(self.trackers_l) > 0:
+                cv.imshow('tracker state', self.trackers_l[-1].state_vis)
+            self.rect_sel.draw(vis_l)
+
+            cv.imshow('frame left', vis_l)
+            cv.imshow('frame right', vis_r)
             ch = cv.waitKey(10)
             if ch == 27:
                 break
             if ch == ord(' '):
                 self.paused = not self.paused
             if ch == ord('c'):
-                self.trackers.pop()
+                self.trackers_l.pop()
+                self.trackers_r.pop()
             if ch == ord('u'):  
                 self.update_rate = 0.1 if self.update_rate < 0.001 else 0              
 
@@ -313,6 +352,6 @@ if __name__ == '__main__':
     except:
         video_src = 'iid'
 
-    App(0, paused = '--pause' in opts).run()
+    #App(0, paused = '--pause' in opts).run()
 
-    #AppRS(video_src, paused = '--pause' in opts).run()
+    AppRS(video_src, paused = '--pause' in opts).run()
