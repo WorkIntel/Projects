@@ -5,7 +5,7 @@ Created on Sep 04 16:53:13 2019
 2D STFT transform for correlation of a single pattern
 
 Environment : 
-    Pose6D
+    planes
 
 Installation:
 

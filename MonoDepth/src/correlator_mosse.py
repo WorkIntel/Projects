@@ -45,6 +45,9 @@ sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
 
 
+
+
+# -----------------------------
 def rnd_warp(a):
     h, w        = a.shape[:2]
     T           = np.zeros((2, 3))
@@ -66,6 +69,8 @@ def divSpec(A, B):
 
 eps = 1e-5
 
+            
+# ------------------------------------------
 class MOSSE:
     def __init__(self, frame, rect):
         x1, y1, x2, y2  = rect
