@@ -30,9 +30,6 @@ import cv2 as cv
 import os
 
 
-
-
-
 import matplotlib.pyplot as plt
 from matplotlib import cm
 plt.style.use('dark_background')
@@ -1239,6 +1236,7 @@ class DisplayManager:
         if ax is None or fig is None:
             fig = plt.figure(1)
             plt.clf() 
+            plt.ion()
             #fig.canvas.set_window_title('3D Scene')
             try:
                 ax = fig.gca(projection='3d')
