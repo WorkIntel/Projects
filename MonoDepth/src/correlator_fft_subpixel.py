@@ -30,10 +30,11 @@ from numpy import unravel_index
 import sys 
 sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
-from common import log
+from common import log, RectSelector
 
 sys.path.append(r'..\MonoDepth\src')
 from peak_fit_2d import peak_fit_2d
+
 
 eps = 1e-6
 # ----------------------
@@ -124,12 +125,14 @@ class DataGenerator:
         elif img_type == 4:
             self.imgD = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_029.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_031.png", cv.IMREAD_GRAYSCALE)
-            self.imgR = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE)              
+            self.imgR = cv.imread(r"C:\Data\Depth\RobotAngle\image_rgb_030.png", cv.IMREAD_GRAYSCALE)    
+            self.imgL = np.roll(self.imgL[100:400,100:600], np.array([0, 0]), axis=(0, 1)) 
+            self.imgR = self.imgR[100:400,100:600]        
 
         elif img_type == 5:
             self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d2_Depth.png", cv.IMREAD_GRAYSCALE))
-            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l2_Infrared.png", cv.IMREAD_GRAYSCALE))
-            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\r2_Infrared.png", cv.IMREAD_GRAYSCALE) )             
+            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE))
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE) )             
 
         elif img_type == 6: # same image with shift
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
@@ -348,7 +351,7 @@ class CORR:
            
 
         side_resp   = resp.copy()
-        #side_resp = cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)
+        side_resp   = cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)
         smean, sstd = side_resp.mean(), side_resp.std()
         psr         = (mval-smean) / (sstd+eps)
 
@@ -361,6 +364,9 @@ class CORR:
         # #print(f"{my:.2f},{mx:.2f}: {yp:.2f},{xp:.2f}")
         # print(f"{my:.2f},{mx:.2f}")
         # #time.sleep(0.5)
+        xp, yp      = peak_fit_2d(side_resp)
+        xp, yp      = xp - 5, yp - 5
+        print(f'Peak subpixel : {xp:.2f}, {yp:.2f}')
 
 
         #side_resp       = resp.copy()
@@ -434,7 +440,7 @@ class TestCORR(unittest.TestCase):
         "correlator of left and right random images - with interpolation"
 
         d       = DataGenerator()
-        isOk    = d.init_image(img_type = 6)  # 12-ok
+        isOk    = d.init_image(img_type = 4)  # 12-ok, 6,7-ok, 5-ok
         d.show_images()
 
         p       = CORR()
@@ -513,21 +519,129 @@ class App:
             if ch == 27:
                 break
 
+# RealSense L or R App
+class AppRS:
+    def __init__(self, video_src = 'iid', paused = False):
+        #self.cap = video.create_capture(video_src)
+        self.cap        = RealSense(video_src)
+        #self.cap        = RealSense('ggd')
+        _, self.frame   = self.cap.read()
+        frame_gray      = self.get_frame_gray(0)
+        vis             = cv.cvtColor(frame_gray, cv.COLOR_GRAY2BGR) 
+        cv.imshow('frame left', vis)
+        cv.imshow('frame right', vis)
+        self.rect_sel   = RectSelector('frame left', self.onrect)
+        self.rect_left  = []
+        self.rect_right = []
+        self.paused     = paused
+        self.update_rate= 0
+        self.corr       = CORR()
+
+    def get_frame_gray(self, frame_type = 0):
+        "extracts gray frame"
+        if frame_type == 0:
+            frame_gray = self.frame[:,:,0]
+        elif frame_type == 1:
+            frame_gray = self.frame[:,:,1]            
+        else:
+            frame_gray = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+        return frame_gray   
+
+    def get_bbox(self, rect):
+        "transform rect to bbox"
+        x1, y1, x2, y2  = rect
+        w, h            = map(cv.getOptimalDFTSize, [x2-x1, y2-y1])
+        x1, y1          = (x1+x2-w)//2, (y1+y2-h)//2
+        x, y            = x1+0.5*(w-1), y1+0.5*(h-1) 
+        return x,y,w,h
+
+    def get_frame_roi(self, rect = [0,0,10,10], frame_type = 0):
+        "extract rectangles"
+        x,y,w,h         = self.get_bbox(rect)
+        frame_gray      = self.get_frame_gray(frame_type)
+        imgL            = cv.getRectSubPix(frame_gray, (w, h), (x, y))   
+        return imgL
+
+    def onrect(self, rect):
+        #frame_gray      = self.frame #cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
+        #frame_gray      = self.get_frame_gray(0)
+        self.rect_left.append(rect)  
+        #rect[0]          += 10  # right image offset
+        self.rect_right.append(rect)   
+
+    def draw_rect(self, vis, rect):
+        "rect on the image"
+        x,y,w,h         = self.get_bbox(rect)
+        x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
+        vis            = cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
+        #draw_str(vis, (x1, y2+16), 'PSR: %.2f' % self.psr)
+        return vis        
+
+    def run(self):
+        "main loop"
+        imgC = None
+        while True:
+            if not self.paused:
+                ret, frame_c = self.cap.read()
+                if not ret:
+                    break
+                self.frame  = frame_c #[:,:,0]
+           
+
+            for k in range(len(self.rect_left)):
+                imgL        = self.get_frame_roi(self.rect_left[k],  0)
+                imgR        = self.get_frame_roi(self.rect_right[k], 1)
+                imgC        = self.corr.correlate(imgL, imgR)
+            
+            vis_l = cv.cvtColor(self.frame[:,:,0], cv.COLOR_GRAY2BGR) 
+            for rect in self.rect_left:
+                vis_l = self.draw_rect(vis_l, rect)
+
+            vis_r = cv.cvtColor(self.frame[:,:,1], cv.COLOR_GRAY2BGR) 
+            for rect in self.rect_right:
+                vis_r = self.draw_rect(vis_r, rect)         
+
+            # draw during mouse move
+            self.rect_sel.draw(vis_l)
+
+            if imgC is not None:
+                imgCB = np.uint8(imgC/imgC.max()*255)
+                cv.imshow('Corr', imgCB)
+
+
+            cv.imshow('frame left',  vis_l)
+            cv.imshow('frame right', vis_r)
+            ch = cv.waitKey(10)
+            if ch == 27:
+                break
+            if ch == ord(' '):
+                self.paused = not self.paused
+            if ch == ord('c'):
+                self.rect_left.pop()
+                self.rect_right.pop()
+            if ch == ord('u'):  
+                #self.update_rate = 0.1 if self.update_rate < 0.001 else 0    
+                for k in range(len(self.rect_left)):
+                    rect = self.rect_left[k]
+                    self.rect_left[k] = (rect[0]-1,rect[1],rect[2],rect[3])
+
+        cv.destroyAllWindows()
+
 # -------------------------- 
 if __name__ == '__main__':
     #print(__doc__)
 
-     #unittest.main()
-    suite = unittest.TestSuite()
+    #  #unittest.main()
+    # suite = unittest.TestSuite()
 
+    # #suite.addTest(TestCORR("test_1d"))
+    # #suite.addTest(TestCORR("test_corr")) # ok
+    # suite.addTest(TestCORR("test_corr_interpolated")) # ok
 
-    #suite.addTest(TestCORR("test_1d"))
-    #suite.addTest(TestCORR("test_corr")) # ok
-    suite.addTest(TestCORR("test_corr_interpolated")) # ok
+    # runner = unittest.TextTestRunner()
+    # runner.run(suite)
 
-
-    runner = unittest.TextTestRunner()
-    runner.run(suite)
+    AppRS('iid').run()
 
 
 
