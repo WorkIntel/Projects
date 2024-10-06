@@ -45,8 +45,6 @@ sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
 
 
-
-
 # -----------------------------
 def rnd_warp(a):
     h, w        = a.shape[:2]
@@ -56,8 +54,8 @@ def rnd_warp(a):
     c, s        = np.cos(ang), np.sin(ang)
     T[:2, :2]   = [[c,-s], [s, c]]
     T[:2, :2]  += (np.random.rand(2, 2) - 0.5)*coef
-    c           = (w/2, h/2)
-    T[:,2]      = c - np.dot(T[:2, :2], c)
+    Tc          = (w/2, h/2)
+    T[:,2]      = Tc - np.dot(T[:2, :2], Tc)
     return cv.warpAffine(a, T, (w, h), borderMode = cv.BORDER_REFLECT)
 
 def divSpec(A, B):

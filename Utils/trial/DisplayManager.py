@@ -2477,8 +2477,8 @@ if __name__ == '__main__':
     #singletest.addTest(TestDisplayManager("test_TestRenderaGripperHangersSeparators"))   #  
     #singletest.addTest(TestDisplayManager("test_TestInitShowCameraBaseTool"))   # ok 
     
-    #singletest.addTest(TestDisplayManager("test_RealTimeUpdate"))  # ok    
-    singletest.addTest(TestDisplayManager("test_RealTimeToolUpdate"))  # ok    
+    singletest.addTest(TestDisplayManager("test_RealTimeUpdate"))  # ok    
+    #singletest.addTest(TestDisplayManager("test_RealTimeToolUpdate"))  # ok    
     #singletest.addTest(TestDisplayManager("test_RealTimeToolUpdateWithFunction"))  # ok    
     #singletest.addTest(TestDisplayManager("test_RealTimeCameraUpdateWithFunction"))  #  
     

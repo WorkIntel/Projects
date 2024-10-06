@@ -286,6 +286,8 @@ class CORR:
     def __init__(self):
 
         self.frame_size     = (640,480)
+        self.pos            = (0, 0)
+        self.psr            = 0
 
     def check(self, img1, img2):
         "checking images"
@@ -336,7 +338,7 @@ class CORR:
         C           = cv.mulSpectrums(A, B, 0, conjB=True)
 
         #respr       = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
-        #respr       = np.fft.fftshift(respr) # Shift the zero-frequency component to the center
+        #resp        = np.fft.fftshift(respr) # Shift the zero-frequency component to the center
 
         # UD  subpixel
         respc       = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_COMPLEX_OUTPUT)
@@ -346,34 +348,37 @@ class CORR:
         h, w        = resp.shape
         _, mval, _, (mx, my) = cv.minMaxLoc(resp)
 
-        cval        = respc[my,mx,:].squeeze()
-        angl        = np.arctan2(cval[0],cval[1])*180/np.pi
+        #cval        = respc[my,mx,:].squeeze()
+        #angl        = np.arctan2(cval[0],cval[1])*180/np.pi
            
 
         side_resp   = resp.copy()
-        side_resp   = cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)
+        #side_resp   = cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)
+        #side_resp   = side_resp[my-5:my+6,mx-5:mx+6]
         smean, sstd = side_resp.mean(), side_resp.std()
         psr         = (mval-smean) / (sstd+eps)
 
-        # # sub pixel
-        # search_size = 3
-        # z           = resp[my-search_size:my+search_size, mx-search_size:mx+search_size]
-        # xp, yp      = peak_fit_2d(z)
-        # xp, yp      = xp - search_size, yp - search_size     
+        # sub pixel
+        search_size = 3
+        z           = resp[my-search_size:my+search_size, mx-search_size:mx+search_size]
+        xp, yp      = peak_fit_2d(z)
+        xp, yp      = xp - search_size, yp - search_size     
         # #mx, my      = mx + xp, my + yp
         # #print(f"{my:.2f},{mx:.2f}: {yp:.2f},{xp:.2f}")
         # print(f"{my:.2f},{mx:.2f}")
         # #time.sleep(0.5)
-        xp, yp      = peak_fit_2d(side_resp)
-        xp, yp      = xp - 5, yp - 5
-        print(f'Peak subpixel : {xp:.2f}, {yp:.2f}')
+        #xp, yp      = peak_fit_2d(side_resp)
+        #xp, yp      = xp - 5, yp - 5
+        #print(f'Peak subpixel : {xp:.2f}, {yp:.2f}')
 
 
         #side_resp       = resp.copy()
         #cv.rectangle(side_resp, (mx-5, my-5), (mx+5, my+5), 0, -1)    
         # 
-        print(f"PSR {psr:.2f} : {my},{mx}: {cval[0]:.2f}, {cval[1]:.2f} : {angl:.2f}")        
+        print(f"Region : {w},{h} : psr {psr:.2f} : pos: {mx},{my} : subpixel : {xp:.2f}, {yp:.2f}")        
 
+        self.pos        = (mx+xp-w//2, my+yp-h//2)
+        self.psr        = psr
         return resp
     
     def show_result(self, image_patch):
@@ -479,7 +484,6 @@ class TestCORR(unittest.TestCase):
         plt.show()
 
             
-
 # ----------------------
 #%% App
 class App:
@@ -569,6 +573,22 @@ class AppRS:
         #rect[0]          += 10  # right image offset
         self.rect_right.append(rect)   
 
+    def update_rect(self, rect):
+        "up[date rect according to correlation results"
+        
+        self.good = self.corr.psr > 12.0 and self.update_rate > 0.001
+        if not self.good:
+            return rect
+        
+        dx,dy               = self.corr.pos
+        dx,dy               = -dx*self.update_rate,-dy*self.update_rate             
+        x1, y1, x2, y2      = rect
+        x1, y1              = x1+dx, y1+dy
+        x2, y2              = x2+dx, y2+dy        
+        rect                = (int(x1), int(y1), int(x2), int(y2))
+        #print(f"RECT : {x1},{y1} : {dx:.2f},{dy:.2f}")
+        return rect
+
     def draw_rect(self, vis, rect):
         "rect on the image"
         x,y,w,h         = self.get_bbox(rect)
@@ -592,6 +612,10 @@ class AppRS:
                 imgL        = self.get_frame_roi(self.rect_left[k],  0)
                 imgR        = self.get_frame_roi(self.rect_right[k], 1)
                 imgC        = self.corr.correlate(imgL, imgR)
+
+            # update all the time
+            for k, rect in enumerate(self.rect_right):
+                self.rect_right[k]  = self.update_rect(rect)                
             
             vis_l = cv.cvtColor(self.frame[:,:,0], cv.COLOR_GRAY2BGR) 
             for rect in self.rect_left:
@@ -619,11 +643,12 @@ class AppRS:
             if ch == ord('c'):
                 self.rect_left.pop()
                 self.rect_right.pop()
-            if ch == ord('u'):  
-                #self.update_rate = 0.1 if self.update_rate < 0.001 else 0    
-                for k in range(len(self.rect_left)):
-                    rect = self.rect_left[k]
-                    self.rect_left[k] = (rect[0]-1,rect[1],rect[2],rect[3])
+            if ch == ord('m'):  # move manually
+                for k, rect in enumerate(self.rect_right):
+                    self.rect_right[k]  = (rect[0]-1,rect[1],rect[2]-1,rect[3])
+            if ch == ord('u'):  # automatically
+                self.update_rate = 0.1 if self.update_rate < 0.001 else 0
+                
 
         cv.destroyAllWindows()
 

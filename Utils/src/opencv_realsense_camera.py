@@ -7,7 +7,7 @@ OpenCV like wrapper for Real Sense Camera
 Allows to read, display store video and images of RGB - Depth combinations in different formats.  
 Can extract left and right IR images.
 Aligns RGB and Depth data.
-Can save data as mp4 or single images
+Can save data as mp4 or single images.
 
 Usage:
     python opencv_realsense_camera.py 
@@ -26,7 +26,7 @@ Install :
 
 
 '''
-
+import os
 import pyrealsense2 as rs
 import numpy as np
 import cv2 as cv
@@ -68,8 +68,6 @@ class RealSense(object):
             print(e)
 
 
-
-
         #found_rgb = False
         # for s in device.sensors:
         #     if s.get_info(rs.camera_info.name) == 'RGB Camera':
@@ -85,26 +83,27 @@ class RealSense(object):
         # #self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         # #self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
         # Start streaming
-        profile         = self.pipeline.start(self.config)
+        profile             = self.pipeline.start(self.config)
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
-        depth_sensor    = profile.get_device().first_depth_sensor()
-        depth_scale     = depth_sensor.get_depth_scale()
+        self.depth_sensor   = profile.get_device().first_depth_sensor()
+        depth_scale         = self.depth_sensor.get_depth_scale()
         print("Depth Scale is: " , depth_scale)
 
         # # turn emitter on-off
         # if device_product_line != 'D400':
         #     depth_sensor.set_option(rs.option.emitter_enabled, 0)
         # check features
-        has_projector   = device_name.find('D455') > 0
-        if not has_projector:
-            print('Camera without projector')
-        else:
-            if self.use_projector is False:
-                depth_sensor.set_option(rs.option.emitter_always_on, False)
-                depth_sensor.set_option(rs.option.emitter_enabled, False)
+        self.has_projector       = device_name.find('D455') > 0
+        # if not self.has_projector:
+        #     print('Camera without projector')
+        # else:
+        #     if self.use_projector is False:
+        #         self.depth_sensor.set_option(rs.option.emitter_always_on, False)
+        #         self.depth_sensor.set_option(rs.option.emitter_enabled, False)
                 
-            print('Camera projector : %s' %str(self.use_projector))        
+        #     print('Camera projector : %s' %str(self.use_projector))     
+        self.switch_projector()   
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -119,6 +118,17 @@ class RealSense(object):
     def render(self, dst):
         pass
 
+    def switch_projector(self):
+        "switch projectpr on-off"        
+        if not self.has_projector:
+            print('Camera is without projector')
+        else:
+            #if self.use_projector is False:
+            self.depth_sensor.set_option(rs.option.emitter_always_on, self.use_projector)
+            self.depth_sensor.set_option(rs.option.emitter_enabled, self.use_projector)
+                
+            print('Camera projector : %s' %str(self.use_projector))       
+
     def change_mode(self, mode = 'rgb'):
         if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2','iig']):
              print(f'Not supported mode = {mode}')
@@ -129,6 +139,7 @@ class RealSense(object):
 
     def read(self, dst=None):
         "with frame alignments and color space transformations"
+        #self.use_projector = not self.use_projector # testing
         w, h                = self.frame_size
 
         # Wait for a coherent pair of frames: depth and color
@@ -201,7 +212,7 @@ class RealSense(object):
         elif self.mode == 'iig':
             image_out       = np.stack((irl_image, irr_image, color_image[:,:,1]), axis = 2)                  
         elif self.mode == 'dep':
-            image_out  = depth_image                    
+            image_out       = depth_image                    
         return True, image_out
 
     def read_not_aligned(self, dst=None):
@@ -216,8 +227,8 @@ class RealSense(object):
             return False, None
 
         # Convert images to numpy arrays
-        depth_image = np.asanyarray(depth_frame.get_data())
-        color_image = np.asanyarray(color_frame.get_data())
+        depth_image     = np.asanyarray(depth_frame.get_data())
+        color_image     = np.asanyarray(color_frame.get_data())
         #color_image = cv.cvtColor(depth_image, cv.COLOR_GRAY2RGB)
         #depth_image = cv.cvtColor(color_image, cv.COLOR_RGB2GRAY)
 
@@ -254,13 +265,23 @@ class RealSense(object):
         # record video to a file is switched on
         if (self.vout is None) and (self.record_on is True):
             fourcc  = cv.VideoWriter_fourcc(*'mp4v')
-            fname   = '.\\video_%s.mp4' % (self.mode)
+            k       = 0
+            fname   = '.\\video_%s_%03d.mp4' % (self.mode,k)
+            while os.path.exists(fname):
+                k      +=1
+                fname   = '.\\video_%s_%03d.mp4' % (self.mode,k)
+
             self.vout     = cv.VideoWriter(fname, fourcc, 20.0, self.frame_size)
             print('Writing video to file %s' %fname)
             self.count = 0
 
         # write frame
         if (self.vout is not None) and (self.record_on is True):
+            ""
+            if len(frame.shape) < 3:
+                frame = frame[:self.frame_size[1],:self.frame_size[0]]
+                frame = cv.cvtColor(frame, cv.COLOR_GRAY2RGB)
+
             self.vout.write(frame)
             self.count += 1  
             if self.count % 100 == 0:
@@ -306,7 +327,7 @@ class RealSense(object):
             self.change_mode('ii2') 
         elif ch == ord('o'):
             self.change_mode('iid') 
-        elif ch == ord('p'):
+        elif ch == ord('k'):
             self.change_mode('iig')            
         elif ch == ord('h'):
             self.change_mode('dep')                 
@@ -317,11 +338,13 @@ class RealSense(object):
         elif ch == ord('r'):
             self.record_on = not self.record_on
             print('Video record %s' %str(self.record_on))
+        elif ch == ord('p'):
+            self.use_projector = not self.use_projector
+            self.switch_projector()
         elif ch != 255:
             print('unrecognized key - check your language setttings on the keyboard, must be English.')
         return do_exit
           
-
     def close(self):
         # stop record
         self.record_release()
