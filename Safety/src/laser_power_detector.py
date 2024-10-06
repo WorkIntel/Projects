@@ -232,6 +232,7 @@ class LaserPowerEstimator:
         # show / debug
         self.idx             = estimator_id         # figure name to show        
         self.estimator_type  = estimator_type        # which type of the estimation to use
+        self.estimator_options = {1:'std',2:'std integrated',11:'percent 30',12:'percent 10'}
 
         
         #self.channel_num     = 1      # how many channels are processed - depends on the mode  
@@ -453,9 +454,11 @@ class LaserPowerEstimator:
             vis     = cv.cvtColor(frame, cv.COLOR_GRAY2RGB)
 
         # rectangle state
-        vis         = self.draw_state(vis)
+        vis             = self.draw_state(vis)
 
-        figure_name = f'Estimator {self.idx}'
+        # type of the estimator
+        estimator_name  = self.estimator_options[self.estimator_type]
+        figure_name     = f'{estimator_name} - {self.idx}'
         cv.imshow(figure_name, vis)
         ch  = cv.waitKey(30)
         ret = ch != ord('q')     
@@ -543,7 +546,7 @@ class TestPowerEstimator(unittest.TestCase):
     def test_video_std(self):
         "show video and measure std over time"
         d       = DataSource()
-        p       = LaserPowerEstimator(12)
+        p       = LaserPowerEstimator(1)
         srcid   = 11
         rect    = (280,200,360,280)
         ret     = d.init_video(srcid)
@@ -557,6 +560,24 @@ class TestPowerEstimator(unittest.TestCase):
         #p.run_video_integration(str(srcid))
         p.finish()
         self.assertTrue(not ret) 
+
+    def test_video_percentile(self):
+        "show video and measure infrared roi percentile"
+        d       = DataSource()
+        p       = LaserPowerEstimator(12)
+        srcid   = 11
+        rect    = (280,200,360,280)
+        ret     = d.init_video(srcid)
+        retp    = p.init_roi(rect)
+        while ret:
+            retd    = d.get_data()
+            rets    = d.show_data() 
+            retp    = p.update(d.frame_left)
+            ret     = p.show_scene(d.frame_left) and retd
+
+        #p.run_video_integration(str(srcid))
+        p.finish()
+        self.assertTrue(not ret)         
 
     def test_video_integration(self):
         "show video and integrate over time"
@@ -575,14 +596,6 @@ class TestPowerEstimator(unittest.TestCase):
         p.finish()
         self.assertTrue(not ret) 
 
-    def test_TrainingDetection(self):
-        "show video and integrate over time upto 5 sec and then stop integration and do detect"
-        p       = LaserPowerEstimator()
-        srcid   = 1  # 2 - detect gray and depth, 3 - only depth
-        ret     = p.init_video(srcid)
-        p.run_video_integration(str(srcid))
-        p.finish()
-        self.assertTrue(ret)         
 
 # --------------------------------
 #%% App
@@ -596,12 +609,13 @@ class App:
         _, self.frame   = self.cap.read()
         frame_gray      = self.get_frame(0)
         vis             = cv.cvtColor(frame_gray, cv.COLOR_GRAY2BGR) 
-        self.imshow_name= 'Power Detect (u-Update, space-Pause, q-Quit)'
+        self.imshow_name= 'Power Detect (u-Update, p-Project, space-Pause, q-Quit)'
         cv.imshow(self.imshow_name, vis)
         self.rect_sel   = RectSelector(self.imshow_name, self.on_rect)
         self.trackers   = []
         self.paused     = False
         self.update_rate= 0 
+        self.estimator_options = {1:'std',2:'std integrated',11:'percent 30',12:'percent 10'}
 
     def get_frame(self, frame_type = 0):
         "extracts gray frame"
@@ -624,26 +638,12 @@ class App:
 
     def on_rect(self, rect):
         #frame_gray      = self.frame #cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
-        tracker         = LaserPowerEstimator()
-        frame_gray      = self.get_frame(0)
-        tracker.init_frame_roi(frame_gray, rect)
+        estim_ind       = len(self.trackers) + 1
+        estim_type      = 12
+        tracker         = LaserPowerEstimator(estimator_type=estim_type, estimator_id=estim_ind)
+        #frame_gray      = self.get_frame(0)
+        tracker.init_roi(rect)
         self.trackers.append(tracker)
-
-    # def get_bbox(self, rect):
-    #     "transform rect to bbox"
-    #     x1, y1, x2, y2  = rect
-    #     w, h            = map(cv.getOptimalDFTSize, [x2-x1, y2-y1])
-    #     x1, y1          = (x1+x2-w)//2, (y1+y2-h)//2
-    #     x, y            = x1+0.5*(w-1), y1+0.5*(h-1) 
-    #     return x,y,w,h        
-
-    # def draw_rect(self, vis, rect):
-    #     "rect on the image"
-    #     x,y,w,h         = self.get_bbox(rect)
-    #     x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
-    #     vis            = cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
-    #     #draw_str(vis, (x1, y2+16), 'PSR: %.2f' % self.psr)
-    #     return vis        
 
     def run(self):
         while True:
@@ -674,23 +674,25 @@ class App:
             elif ch == ord('c'):
                 self.trackers.pop()
             elif ch == ord('u'):  
-                self.update_rate = 0.1 if self.update_rate < 0.001 else 0                  
+                self.update_rate = 0.1 if self.update_rate < 0.001 else 0  
+            elif ch == ord('p'):
+                self.cap.use_projector = not self.cap.use_projector
+                self.cap.switch_projector()                                
 
 
 if __name__ == '__main__':
     #print(__doc__)
 
-    ""
+    """ 
     #unittest.main()
     suite = unittest.TestSuite()
     #suite.addTest(TestPowerEstimator("test_data_source_rs")) # ok
     #suite.addTest(TestPowerEstimator("test_data_source_video")) # ok
-    suite.addTest(TestPowerEstimator("test_video_std"))
-
-   
+    #suite.addTest(TestPowerEstimator("test_video_std")) # ok
+    suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
     runner = unittest.TextTestRunner()
     runner.run(suite)
-    
+    """
 
-    #App('ii2').run()    
+    App('iig').run()    
 

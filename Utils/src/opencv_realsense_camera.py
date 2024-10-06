@@ -130,7 +130,7 @@ class RealSense(object):
             print('Camera projector : %s' %str(self.use_projector))       
 
     def change_mode(self, mode = 'rgb'):
-        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2','iig']):
+        if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2','iig','iir']):
              print(f'Not supported mode = {mode}')
                
         self.mode = mode  
@@ -211,6 +211,8 @@ class RealSense(object):
             image_out       = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
         elif self.mode == 'iig':
             image_out       = np.stack((irl_image, irr_image, color_image[:,:,1]), axis = 2)                  
+        elif self.mode == 'iir':
+            image_out       = np.stack((irl_image, irr_image, color_image[:,:,0]), axis = 2) 
         elif self.mode == 'dep':
             image_out       = depth_image                    
         return True, image_out
@@ -303,7 +305,7 @@ class RealSense(object):
     def show_image(self, frame):
         "show image on opencv window"
         do_exit = False
-        cv.imshow('frame (c,a,d,1,2,g,s,t,f,h,i,o,p,r: q - to exit)', frame)
+        cv.imshow('frame (c,a,d,1,2,g,s,t,f,h,k,j,i,o,p,r: q - to exit)', frame)
         ch = cv.waitKey(1) & 0xff
         if ch == ord('q') or ch == 27:
             do_exit = True 
@@ -328,7 +330,9 @@ class RealSense(object):
         elif ch == ord('o'):
             self.change_mode('iid') 
         elif ch == ord('k'):
-            self.change_mode('iig')            
+            self.change_mode('iig')    
+        elif ch == ord('j'):
+            self.change_mode('iir')                    
         elif ch == ord('h'):
             self.change_mode('dep')                 
         elif ch == ord('s'):
