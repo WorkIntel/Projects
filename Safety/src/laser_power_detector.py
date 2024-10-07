@@ -81,14 +81,14 @@ class DataSource:
             self.video_src  = RealSense(mode=fmode)                   
 
         elif video_type == 11:
-            "background"
+            "with pattern"
             fname           = r"C:\Users\udubin\Documents\Projects\Safety\data\laser_power\video_ii2_000.mp4"
             fmode           = 'ii2' 
             self.video_src  = cv.VideoCapture(fname)
 
-        elif video_type == 12:
-            "intrusion"
-            fname           = r"..\data\video_gdd_intrusion.mp4"
+        elif video_type == 21:
+            "pattern on - off"
+            fname           = r"C:\Users\udubin\Documents\Projects\Safety\data\laser_power\video_ii2_001_ponoff.mp4"
             fmode           = 'ii2'  
             self.video_src  = cv.VideoCapture(fname)
         else:
@@ -99,7 +99,7 @@ class DataSource:
         self.mode           = fmode  
         self.vtype          = video_type
         #ret                 = self.init_data()
-        self.tprint('Work mode : %s' %fmode)
+        self.tprint('Work mode : %s, video type : %d' %(fmode,video_type))
         return True
       
     def init_roi(self, roi_type = 1):
@@ -232,7 +232,7 @@ class LaserPowerEstimator:
         # show / debug
         self.idx             = estimator_id         # figure name to show        
         self.estimator_type  = estimator_type        # which type of the estimation to use
-        self.estimator_options = {1:'std',2:'std integrated',11:'percent 30',12:'percent 10'}
+        self.estimator_options = {1:'std',2:'std integrated',11:'percent 30',12:'percent 10', 21:'Laser on-off'}
 
         
         #self.channel_num     = 1      # how many channels are processed - depends on the mode  
@@ -249,6 +249,8 @@ class LaserPowerEstimator:
         self.frame_depth_int = None   # process separate channels
         self.integration_enb = True   # enable integration process
         self.show_data_int   = False  # swicth that controls which dta to show
+        self.img_int_mean    = None   # mean integrated image
+        self.img_int_std     = None   # std integrated image
 
         # position and status
         self.img             = None   # original roi image patch
@@ -257,8 +259,7 @@ class LaserPowerEstimator:
         self.good            = True   # psr above some threshold
         self.psr             = 0      # laser power / noise ratio
         self.rect            = None   # adjusted rectangle
-
-
+        self.img_dbg         = None   # debug  image
 
         self.tprint(f'New power estimator type {estimator_type} and id {estimator_id} is defined')
 
@@ -277,17 +278,7 @@ class LaserPowerEstimator:
         self.rect       = x1, y1, x2, y2
         self.tprint('ROI created %s' %str(rect)) 
         return True
-    
-    def init_frame_roi(self, frame, rect):
-        "init ROI center , image and size"
-        x1, y1, x2, y2  = rect
-        w, h            = map(cv.getOptimalDFTSize, [x2-x1, y2-y1])
-        x1, y1          = (x1+x2-w)//2, (y1+y2-h)//2
-        self.pos = x, y = x1+0.5*(w-1), y1+0.5*(h-1)
-        self.size       = w, h
-        self.img        = cv.getRectSubPix(frame, (w, h), (x, y))
-        self.win        = cv.createHanningWindow((w, h), cv.CV_32F)
-        self.tprint('ROI created %s' %str(rect))
+
     
     def preprocess(self, img):
         "image preprocessing - extracts roi and converts from uint8 to float using log function"
@@ -306,7 +297,7 @@ class LaserPowerEstimator:
         assert percent > 0 and percent < 0.5 , 'percentile must be between 0 and 0.5'
         low_val             = np.percentile(img_roi, percent * 100)
         high_val            = np.percentile(img_roi, (1-percent) * 100)
-        psnr                = (high_val - low_val)/(high_val + low_val)
+        psnr                = (high_val - low_val)/(high_val + low_val + 1e-9)
         return psnr    
     
     def estimate_image_psnr(self, img_roi):
@@ -328,21 +319,23 @@ class LaserPowerEstimator:
         self.img_int_std   += rate*(np.abs(img_roi - self.img_int_mean) - self.img_int_std)
         err_std             = self.img_int_std.mean() + 1e-9
         psnr                = img_roi.mean()/err_std
+        self.img_dbg        = self.img_int_std  # debug
         return psnr  
 
+    def estimate_with_pattern_switch(self, img_roi):
+        "assumes one image has pattern and other is not. The order is unknown"
 
-    def integrate_over_time(self):
-        "uses valid pixels to integrate over the time depth and gray channels"
+        # first time
+        if self.img_int_mean is None:
+            self.img_int_mean = img_roi
         
-        alpha                         = 0.1 if self.integration_enb else 0.0
+        img_roi_prev        = self.img_int_mean
+        img_diff            = img_roi - img_roi_prev
 
-        # depth
-        valid_b                        = self.frame_depth > self.MIN_VALID_DEPTH
-        self.frame_depth_int[valid_b] += alpha*(self.frame_depth[valid_b] - self.frame_depth_int[valid_b])
-        # gray
-        self.frame_gray_int           += alpha*(self.frame_gray  - self.frame_gray_int)
-
-        return True
+        psnr                = self.estimate_percentile_contrast(np.abs(img_diff))
+        self.tprint(f'ROI PSNR : {psnr:.2f} ')
+        self.img_dbg        = img_diff  # debug
+        return psnr 
 
     def update(self, frame, rate = 0.1):
         "select differnet estimation techniques"
@@ -355,7 +348,7 @@ class LaserPowerEstimator:
 
         if self.estimator_type == 1: # simple mean / std
 
-            psnr = self.estimate_image_psnr(img_roi)
+            psnr        = self.estimate_image_psnr(img_roi)
 
         elif self.estimator_type == 2: # simple mean / std        
         
@@ -367,26 +360,16 @@ class LaserPowerEstimator:
 
         elif self.estimator_type == 12: # percentile        
         
-            psnr        = self.estimate_percentile_contrast(img_roi, 0.1)                        
+            psnr        = self.estimate_percentile_contrast(img_roi, 0.1)  
+
+        elif self.estimator_type == 21: # on-off switch        
+        
+            psnr        = self.estimate_with_pattern_switch(img_roi)                                   
 
         self.psr = psnr
+        self.img = img_roi   # for debug
         return True
-
-    def draw_state(self, vis):
-        # show state of the estimator
-        if self.rect is None:
-            return vis
-        (x, y), (w, h) = self.pos, self.size
-        x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
-        cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
-        if self.good:
-            cv.circle(vis, (int(x), int(y)), 2, (0, 255, 0), -1)
-        else:
-            cv.line(vis, (x1, y1), (x2, y2), (0, 0, 255))
-            cv.line(vis, (x2, y1), (x1, y2), (0, 0, 255))
-        vis  = draw_str(vis, (x1, y2+16), 'PSR: %.2f' % self.psr)   
-        return vis 
-        
+    
     def convert_frame_for_show(self, frame = None):
         "converts different frame types to the uint8 3 colors"
 
@@ -421,30 +404,35 @@ class LaserPowerEstimator:
         #         img_show = np.stack((img_show[:,:,0],img_show[:,:,1],img_show[:,:,1]),axis = 2)
 
         self.frame_show  = img_show # keep it for click events
-        return img_show 
-   
-    def show_video(self, figure_name = 'Input', roi_list = []):
-        "draw results on video"
-        # deal with black and white
-        self.figure_name    = figure_name
+        return img_show      
+    
+    def show_internal_state(self):
+        "shows some internal info"
+        imgin           = np.uint8(self.img)
+        f               = self.img - self.img.mean()
+        kernel          = np.uint8((f-f.min()) / f.ptp()*255 )
+        r               = self.img_dbg
+        resp            = np.uint8((r-r.min()) / r.ptp()*255) #np.clip(resp/resp.max(), 0, 1)*255)
+        vis             = np.hstack([imgin, kernel, resp])
 
-        while True:
-            ret, frame          = self.get_frame()
-            if not ret:
-                break
+        figure_name     = f'{self.estimator_type} - {self.idx}'        
+        cv.imshow(figure_name, vis)
+        return True    
 
-            # deal with frame shape
-            img_show            = self.convert_frame_for_show(frame)
-
-            # draw rois of processing
-            for roi_p in roi_list:
-                ix,iy,sx,sy = roi_p
-                img_show    = cv.rectangle(img_show,(ix,iy),(sx,sy),(0,255,0),2)
-
-            cv.imshow(figure_name, img_show)
-            ch = cv.waitKey(30)
-            if ch == ord('q'):
-                break    
+    def show_state(self, vis):
+        # show state of the estimator
+        if self.rect is None:
+            return vis
+        (x, y), (w, h) = self.pos, self.size
+        x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
+        cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
+        if self.good:
+            cv.circle(vis, (int(x), int(y)), 2, (0, 255, 0), -1)
+        else:
+            cv.line(vis, (x1, y1), (x2, y2), (0, 0, 255))
+            cv.line(vis, (x2, y1), (x1, y2), (0, 0, 255))
+        vis  = draw_str(vis, (x1, y2+16), 'PSR: %.2f' % self.psr)   
+        return vis 
 
     def show_scene(self, frame):
         "draw scene and ROI"
@@ -454,7 +442,7 @@ class LaserPowerEstimator:
             vis     = cv.cvtColor(frame, cv.COLOR_GRAY2RGB)
 
         # rectangle state
-        vis             = self.draw_state(vis)
+        vis             = self.show_state(vis)
 
         # type of the estimator
         estimator_name  = self.estimator_options[self.estimator_type]
@@ -501,6 +489,29 @@ class LaserPowerEstimator:
             elif ch == ord('t'):
                 self.integration_enb = not self.integration_enb
                 self.tprint('Integration enb %s' %str(self.integration_enb))
+
+    def run_show_video(self, figure_name = 'Input', roi_list = []):
+        "draw results on video"
+        # deal with black and white
+        self.figure_name    = figure_name
+
+        while True:
+            ret, frame          = self.get_frame()
+            if not ret:
+                break
+
+            # deal with frame shape
+            img_show            = self.convert_frame_for_show(frame)
+
+            # draw rois of processing
+            for roi_p in roi_list:
+                ix,iy,sx,sy = roi_p
+                img_show    = cv.rectangle(img_show,(ix,iy),(sx,sy),(0,255,0),2)
+
+            cv.imshow(figure_name, img_show)
+            ch = cv.waitKey(30)
+            if ch == ord('q'):
+                break   
 
     def finish(self):
         # Close down the video stream
@@ -596,6 +607,26 @@ class TestPowerEstimator(unittest.TestCase):
         p.finish()
         self.assertTrue(not ret) 
 
+    def test_video_with_pattern_switch(self):
+        "show video with pattern on off each frame"
+        srcid   = 21       # video tytpe
+        rect    = (280,200,360,280)
+        estid   = 21       # estimator id
+
+        d       = DataSource()
+        p       = LaserPowerEstimator(estimator_type = estid)
+        ret     = d.init_video(srcid)
+        retp    = p.init_roi(rect)
+        while ret:
+            ret     = d.get_data()
+            ret     = d.show_data() and ret
+            retp    = p.update(d.frame_left)
+            ret     = p.show_scene(d.frame_left) and ret
+            reti    = p.show_internal_state()
+
+        p.finish()
+        self.assertTrue(not ret)         
+
 
 # --------------------------------
 #%% App
@@ -659,7 +690,7 @@ class App:
             #vis = self.frame.copy()
             vis = cv.cvtColor(frame_gray, cv.COLOR_GRAY2BGR) 
             for tracker in self.trackers:
-                tracker.draw_state(vis)
+                tracker.show_state(vis)
 
             #if len(self.trackers) > 0:
             #    cv.imshow('tracker state', self.trackers[-1].state_vis)                
@@ -683,16 +714,18 @@ class App:
 if __name__ == '__main__':
     #print(__doc__)
 
-    """ 
+    """ """
     #unittest.main()
     suite = unittest.TestSuite()
     #suite.addTest(TestPowerEstimator("test_data_source_rs")) # ok
     #suite.addTest(TestPowerEstimator("test_data_source_video")) # ok
     #suite.addTest(TestPowerEstimator("test_video_std")) # ok
-    suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
+    #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
+    suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
+    
     runner = unittest.TextTestRunner()
     runner.run(suite)
-    """
+    
 
-    App('iig').run()    
+    #App('iig').run()    
 
