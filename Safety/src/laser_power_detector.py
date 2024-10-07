@@ -31,6 +31,12 @@ sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
 from common import log, RectSelector
 
+
+# see update function
+ESTIMATOR_OPTIONS = {1:'std',2:'std integrated',3:'contrast',4:'contrast',5:'contrast maxim',
+                     11:'saturate',12:'texture', 21:'laser on-off', 31:'iir'}
+
+        
 #import logging as log
 #log.basicConfig(stream=sys.stdout, level=log.DEBUG, format='[%(asctime)s.%(msecs)03d] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',  datefmt="%M:%S")
 # log.getLogger('matplotlib.font_manager').disabled = True
@@ -232,9 +238,7 @@ class LaserPowerEstimator:
         # show / debug
         self.idx             = estimator_id         # figure name to show        
         self.estimator_type  = estimator_type        # which type of the estimation to use
-        self.estimator_options = {1:'std',2:'std integrated',11:'percent 30',12:'percent 10', 21:'Laser on-off'}
 
-        
         #self.channel_num     = 1      # how many channels are processed - depends on the mode  
         self.frame_gray      = None   # process separate channels
         self.frame_depth     = None   # process separate channels
@@ -261,7 +265,8 @@ class LaserPowerEstimator:
         self.rect            = None   # adjusted rectangle
         self.img_dbg         = None   # debug  image
 
-        self.tprint(f'New power estimator type {estimator_type} and id {estimator_id} is defined')
+        estimator_name      = ESTIMATOR_OPTIONS[self.estimator_type]
+        self.tprint(f'New power estimator {estimator_name} and id {estimator_id} is defined')
 
     def init_roi(self, rect):
         "init ROI center and size and make it fft friendly"
@@ -279,6 +284,26 @@ class LaserPowerEstimator:
         self.tprint('ROI created %s' %str(rect)) 
         return True
 
+    def convert_frame_to_gray(self, frame, convert_type = 1):
+        "converts different frames types to 2D frame"
+
+        is_rgb      = len(frame.shape) > 2
+        frame       = frame.astype(np.float32)
+
+        if not is_rgb:
+            frame_out    = frame #.copy()
+
+        elif convert_type == 1:
+            "is coming from iir"
+            frame_out    = frame[:,:,0] - frame[:,:,2]
+        elif convert_type == 2:
+            "is coming from iir"
+            frame_out    = frame[:,:,1] - frame[:,:,2]
+        else:
+            self.tprint('bad convert_type','E') 
+            frame_out    = frame[:,:,0]       
+                
+        return frame_out  
     
     def preprocess(self, img):
         "image preprocessing - extracts roi and converts from uint8 to float using log function"
@@ -292,28 +317,38 @@ class LaserPowerEstimator:
         img_roi           = img_roi #*self.win
         return img_roi    
     
-    def estimate_percentile_contrast(self, img_roi, percent = 0.1):
-        "estimate percentile of ythe ROI. Mean on low and max percent of the image"
+    def estimate_contrast_simple(self, img_roi, percent = 0.1):
+        "estimate percentile of ythe ROI. Mean on low and max percent of the image. Returns 1 if high contrast"
+        assert percent > 0 and percent < 0.5 , 'percentile must be between 0 and 0.5'
+        img_sorted          = np.sort(img_roi, axis=None)
+        cut_ind             = int(len(img_sorted)*percent)
+        low_val             = np.mean(img_sorted[:cut_ind])
+        high_val            = np.mean(img_sorted[-cut_ind:])
+        prob                = 1- (low_val)/(high_val + 1e-9)
+        return prob 
+
+    def estimate_contrast_maxim(self, img_roi, percent = 0.1):
+        "estimate percentile of ythe ROI. Mean on low and max percent of the image. Returns 1 if high contrast"
         assert percent > 0 and percent < 0.5 , 'percentile must be between 0 and 0.5'
         low_val             = np.percentile(img_roi, percent * 100)
         high_val            = np.percentile(img_roi, (1-percent) * 100)
-        psnr                = (high_val - low_val)/(high_val + low_val + 1e-9)
-        return psnr    
+        prob                = (high_val - low_val)/(high_val + low_val + 1e-9)
+        return prob    
     
-    def estimate_image_psnr(self, img_roi):
-        "makes  over ROI and estimaytes roi std. Mean/STD is an output"
-        err_std             = img_roi.std() + 1e-9
-        psnr                = img_roi.mean()/err_std
-        return psnr    
+    def estimate_contrast_std(self, img_roi):
+        "makes  over ROI and estimaytes roi std. Mean/STD is an output. Returns 1 if high contrast"
+        err_std             = img_roi.std() + 1
+        #psnr                = img_roi.mean()/err_std
+        prob                = 1-1/err_std
+        return prob    
 
     def estimate_integrated_image_psnr(self, img_roi, rate = 0.1):
         "makes integration over ROI in time and estimaytes roi std. Mean/STD is an output"
         err_std = 1e6
 
-        if self.start_over or (self.img_int_mean is None):
+        if (self.img_int_mean is None):
             self.img_int_mean = img_roi
             self.img_int_std  = np.zeros_like(img_roi)
-            self.start_over = False
         
         self.img_int_mean  += rate*(img_roi - self.img_int_mean)
         self.img_int_std   += rate*(np.abs(img_roi - self.img_int_mean) - self.img_int_std)
@@ -337,6 +372,24 @@ class LaserPowerEstimator:
         self.img_dbg        = img_diff  # debug
         return psnr 
 
+    def estimate_saturated_probability(self, img_roi):
+        "estimates probability of the saturation. Returns 1 if saturated"
+        assert img_roi.max() < 257, 'image values must be in the ramge 0-255'
+        img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        prob                = img_roi.mean()/256
+        return prob  
+    
+    def estimate_texture_probability(self, img_roi):
+        "estimates probability of the edge textures and edges. Returns 1 if high edge probability or texture"
+        assert img_roi.max() < 257, 'image values must be in the ramge 0-255'
+        img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        img_dx              = img_roi[:,2:] - img_roi[:,:-2]
+        img_dy              = img_roi[2:,:] - img_roi[:-2,:]
+        img_edge            = np.abs(img_dx[2:,:]) + np.abs(img_dy[:,2:]) 
+        # edge noticable difference is around 7
+        prob                = np.minimum(1,img_edge.mean()/10)
+        return prob      
+
     def update(self, frame, rate = 0.1):
         "select differnet estimation techniques"
         ret     = False        
@@ -344,30 +397,64 @@ class LaserPowerEstimator:
             self.tprint('Define ROI')
             return ret
         
-        img_roi     = self.preprocess(frame)
-
         if self.estimator_type == 1: # simple mean / std
 
-            psnr        = self.estimate_image_psnr(img_roi)
+            img_roi     = self.preprocess(frame)
+            psnr        = self.estimate_contrast_std(img_roi)
+            self.good   = psnr > 0.8
 
         elif self.estimator_type == 2: # simple mean / std        
         
+            img_roi     = self.preprocess(frame)        
             psnr        = self.estimate_integrated_image_psnr(img_roi, rate)
+            self.good   = psnr > 0.8
 
-        elif self.estimator_type == 11: # percentile        
+        elif self.estimator_type == 3: # simple mean / std        
         
-            psnr        = self.estimate_percentile_contrast(img_roi, 0.3) 
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_contrast_simple(img_roi, 0.1)
+            self.good   = psnr > 0.8
+            
+        elif self.estimator_type == 4: # percentile        
+        
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_contrast_simple(img_roi, 0.3) 
+            self.good   = psnr > 0.8
 
-        elif self.estimator_type == 12: # percentile        
+        elif self.estimator_type == 5: # percentile        
         
-            psnr        = self.estimate_percentile_contrast(img_roi, 0.1)  
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_contrast_maxim(img_roi, 0.1)  
+            self.good   = psnr > 0.8
+
+        elif self.estimator_type == 11: # saturation probability        
+        
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_saturated_probability(img_roi) 
+            self.good   = psnr > 0.8     
+
+        elif self.estimator_type == 12: # edge probability        
+        
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_texture_probability(img_roi)    
+            self.good   = psnr > 0.8                  
 
         elif self.estimator_type == 21: # on-off switch        
         
-            psnr        = self.estimate_with_pattern_switch(img_roi)                                   
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_with_pattern_switch(img_roi) 
 
-        self.psr = psnr
-        self.img = img_roi   # for debug
+        elif self.estimator_type == 31: # iir        
+        
+            frame_gray  = self.convert_frame_to_gray(frame, convert_type = 1)
+            img_roi     = self.preprocess(frame_gray)        
+            psnr        = self.estimate_contrast_simple(img_roi)             
+
+                                              
+
+        self.psr        = psnr
+        self.img        = img_roi   # for debug
+        self.img_dbg    = img_roi if self.img_dbg is None else self.img_dbg # debug
         return True
     
     def convert_frame_for_show(self, frame = None):
@@ -414,6 +501,8 @@ class LaserPowerEstimator:
         r               = self.img_dbg
         resp            = np.uint8((r-r.min()) / r.ptp()*255) #np.clip(resp/resp.max(), 0, 1)*255)
         vis             = np.hstack([imgin, kernel, resp])
+        while vis.shape[1] < 128:
+            vis         = cv.resize(vis, (vis.shape[0]<<1,vis.shape[1]<<1), interpolation=cv.INTER_LINEAR)
 
         figure_name     = f'{self.estimator_type} - {self.idx}'        
         cv.imshow(figure_name, vis)
@@ -425,13 +514,13 @@ class LaserPowerEstimator:
             return vis
         (x, y), (w, h) = self.pos, self.size
         x1, y1, x2, y2 = int(x-0.5*w), int(y-0.5*h), int(x+0.5*w), int(y+0.5*h)
-        cv.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255))
+        cv.rectangle(vis, (x1, y1), (x2, y2), (0, 200, 200))
         if self.good:
             cv.circle(vis, (int(x), int(y)), 2, (0, 255, 0), -1)
         else:
             cv.line(vis, (x1, y1), (x2, y2), (0, 0, 255))
             cv.line(vis, (x2, y1), (x1, y2), (0, 0, 255))
-        vis  = draw_str(vis, (x1, y2+16), 'PSR: %.2f' % self.psr)   
+        vis  = draw_str(vis, (x1, y2+16), 'P: %.2f' % self.psr)   
         return vis 
 
     def show_scene(self, frame):
@@ -445,7 +534,7 @@ class LaserPowerEstimator:
         vis             = self.show_state(vis)
 
         # type of the estimator
-        estimator_name  = self.estimator_options[self.estimator_type]
+        estimator_name  = ESTIMATOR_OPTIONS[self.estimator_type]
         figure_name     = f'{estimator_name} - {self.idx}'
         cv.imshow(figure_name, vis)
         ch  = cv.waitKey(30)
@@ -627,15 +716,14 @@ class TestPowerEstimator(unittest.TestCase):
         p.finish()
         self.assertTrue(not ret)         
 
-
 # --------------------------------
 #%% App
-class App:
-    def __init__(self, video_src = 'ii2'):
+class RunApp:
+    def __init__(self, video_src = 'iir'):
 
         #self.cap = video.create_capture(video_src)
         self.cap        = RealSense(video_src)
-        self.cap.change_mode('iig')
+        self.cap.change_mode('iir')
 
         _, self.frame   = self.cap.read()
         frame_gray      = self.get_frame(0)
@@ -646,7 +734,7 @@ class App:
         self.trackers   = []
         self.paused     = False
         self.update_rate= 0 
-        self.estimator_options = {1:'std',2:'std integrated',11:'percent 30',12:'percent 10'}
+        self.estim_type = 1
 
     def get_frame(self, frame_type = 0):
         "extracts gray frame"
@@ -665,13 +753,19 @@ class App:
         if h < w2:
             frame_gray = frame_gray[:,:w2]
 
-        return frame_gray                  
+        return frame_gray  
+
+    def switch_estimator(self):
+        "gets the next estimator"        
+        estim           = list(ESTIMATOR_OPTIONS.keys())
+        ind             = estim.index(self.estim_type)
+        self.estim_type = estim[(ind + 1) % len(estim) ] 
+        print(f'Estimator {ESTIMATOR_OPTIONS[self.estim_type]} with id {self.estim_type} is enabled')       
 
     def on_rect(self, rect):
         #frame_gray      = self.frame #cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
         estim_ind       = len(self.trackers) + 1
-        estim_type      = 12
-        tracker         = LaserPowerEstimator(estimator_type=estim_type, estimator_id=estim_ind)
+        tracker         = LaserPowerEstimator(estimator_type=self.estim_type, estimator_id=estim_ind)
         #frame_gray      = self.get_frame(0)
         tracker.init_roi(rect)
         self.trackers.append(tracker)
@@ -692,8 +786,10 @@ class App:
             for tracker in self.trackers:
                 tracker.show_state(vis)
 
-            #if len(self.trackers) > 0:
-            #    cv.imshow('tracker state', self.trackers[-1].state_vis)                
+            # debug - shows internal info
+            for tracker in self.trackers:
+                tracker.show_internal_state()
+                         
 
             self.rect_sel.draw(vis) # draw rectangle
             cv.imshow(self.imshow_name, vis)
@@ -708,13 +804,14 @@ class App:
                 self.update_rate = 0.1 if self.update_rate < 0.001 else 0  
             elif ch == ord('p'):
                 self.cap.use_projector = not self.cap.use_projector
-                self.cap.switch_projector()                                
+                self.cap.switch_projector()   
+            elif ch == ord('n'):  # switch estimator types one by one
+                self.switch_estimator()
+                          
 
-
-if __name__ == '__main__':
-    #print(__doc__)
-
-    """ """
+# --------------------------------
+#%% Run Test
+def RunTest():
     #unittest.main()
     suite = unittest.TestSuite()
     #suite.addTest(TestPowerEstimator("test_data_source_rs")) # ok
@@ -722,10 +819,12 @@ if __name__ == '__main__':
     #suite.addTest(TestPowerEstimator("test_video_std")) # ok
     #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
     suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
-    
     runner = unittest.TextTestRunner()
     runner.run(suite)
-    
 
-    #App('iig').run()    
+if __name__ == '__main__':
+    #print(__doc__)
+
+    #RunTest()
+    RunApp('iig').run()    
 
