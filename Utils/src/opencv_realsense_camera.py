@@ -30,6 +30,7 @@ import os
 import pyrealsense2 as rs
 import numpy as np
 import cv2 as cv
+import time
 
 class RealSense(object):
     def __init__(self,  mode = 'rgb', use_ir = True, **params):
@@ -127,7 +128,9 @@ class RealSense(object):
             self.depth_sensor.set_option(rs.option.emitter_always_on, self.use_projector)
             self.depth_sensor.set_option(rs.option.emitter_enabled, self.use_projector)
                 
-            print('Camera projector : %s' %str(self.use_projector))       
+            time.sleep(0.1) # wait for camera on - off
+            print('Camera projector : %s' %str(self.use_projector)) 
+            
 
     def change_mode(self, mode = 'rgb'):
         if not(mode in ['rgb','rgd','gd','ddd','ggd','gdd','scl','sc2','dep','iid','ii2','iig','iir']):

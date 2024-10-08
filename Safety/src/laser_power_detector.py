@@ -413,9 +413,10 @@ class LaserPowerEstimator:
         img_roi_prev        = self.img_int_mean
         img_diff            = img_roi - img_roi_prev
 
-        psnr                = self.estimate_percentile_contrast(np.abs(img_diff))
-        self.tprint(f'ROI PSNR : {psnr:.2f} ')
+        psnr                = self.estimate_percentile_simple(np.abs(img_diff))
+
         self.img_dbg        = img_diff  # debug
+        self.img_int_mean   = img_roi
         return psnr 
 
     def estimate_saturation_probability(self, img_roi):
@@ -534,6 +535,7 @@ class LaserPowerEstimator:
         
             img_roi     = self.preprocess(frame)        
             psnr        = self.estimate_with_pattern_switch(img_roi) 
+            self.good   = psnr > 0.8
 
         elif self.estimator_type == 31: # iir        
         
@@ -867,13 +869,14 @@ class RunApp:
         _, self.frame   = self.cap.read()
         frame_gray      = self.get_frame(0)
         vis             = cv.cvtColor(frame_gray, cv.COLOR_GRAY2BGR) 
-        self.imshow_name= 'Power Detect (u-Update, p-Project, space-Pause, q-Quit)'
+        self.imshow_name= 'Power Detect (u-Update, p-Project, s-Switch, space-Pause, q-Quit)'
         cv.imshow(self.imshow_name, vis)
         self.rect_sel   = RectSelector(self.imshow_name, self.on_rect)
         self.trackers   = []
         self.paused     = False
         self.update_rate= 0 
         self.estim_type = estimator_type
+        self.projector_toggle = False
 
     def get_frame(self, frame_type = 0):
         "extracts gray frame"
@@ -911,7 +914,9 @@ class RunApp:
         elif ch == 5:
             self.estim_type = 41    
         elif ch == 6:
-            self.estim_type = 42                                                 
+            self.estim_type = 42       
+        elif ch == 7:
+            self.estim_type = 21                                                       
 
         print(f'Estimator {ESTIMATOR_OPTIONS[self.estim_type]} with id {self.estim_type} is enabled')       
 
@@ -942,8 +947,13 @@ class RunApp:
             # debug - shows internal info
             for tracker in self.trackers:
                 tracker.show_internal_state()
-                         
 
+            # toggle projector each frmae
+            if self.projector_toggle:
+                self.cap.use_projector = not self.cap.use_projector
+                self.cap.switch_projector() 
+
+                         
             self.rect_sel.draw(vis) # draw rectangle
             cv.imshow(self.imshow_name, vis)
             ch = cv.waitKey(1)
@@ -958,9 +968,16 @@ class RunApp:
             elif ch == ord('p'):
                 self.cap.use_projector = not self.cap.use_projector
                 self.cap.switch_projector()   
+            elif ch == ord('p'):
+                self.projector_toggle = False
+                self.cap.use_projector = not self.cap.use_projector
+                self.cap.switch_projector()  
+            elif ch == ord('s'):
+                self.projector_toggle = not self.projector_toggle 
+                print(f'Projector toggle is {self.projector_toggle}')                                 
             elif ch == ord('n'):  # switch estimator types one by one
                 self.switch_estimator()
-            elif 48 < ch and ch < 58 : #in [ord('1'), ord('2'), ord('3'), ord('4'), ord('5')] :  # switch estimator types one by one
+            elif 48 < ch and ch < 58 :  # switch estimator types by number
                 self.switch_estimator(ch - 48)         # start from 1                 
 
 # --------------------------------
@@ -984,6 +1001,6 @@ def RunTest():
 if __name__ == '__main__':
     #print(__doc__)
 
-    RunTest()
-    #RunApp('iig').run()    
+    #RunTest()
+    RunApp('iig').run()    
 
