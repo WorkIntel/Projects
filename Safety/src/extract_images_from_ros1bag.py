@@ -2,11 +2,13 @@
 
 import os
 import argparse
+import numpy as np
 
 from pathlib import Path
 import pprint
 
 from rosbags.highlevel import AnyReader
+import cv2 as cv
 
 
 def parse_cli_args():
@@ -18,14 +20,16 @@ def parse_cli_args():
         "--input",
         type=str,
         help="Input bag path (folder or filepath) to read from",
-        required=True,
+        default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent.bag",
+        required=False,
     )
     parser.add_argument(
         "-o",
         "--output",
         type=str,
         help="Output path for serialized data",
-        required=True,
+        default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent",
+        required=False,
     )
     parser.add_argument(
         "-t",
@@ -34,6 +38,7 @@ def parse_cli_args():
         type=str,
         nargs="+",
         help="List of topics to be serialized",
+        default =  '/device_0/sensor_0/Infrared_1/image/data', #'/device_0/sensor_0/Depth_0/image/data',
         required=False,
     )
     args = parser.parse_args()
@@ -92,7 +97,82 @@ def extract_from_rosbag(args, filepath):
                 print(f"I don't know how to parse topic: {connection.topic}")
 
 
+# def bin_two_image():
+#     from PIL import Image
+#     import io
+#     width       = 640
+#     height      = 360
+#     file_path   = 'path_to_your_image_file.bin'
+#     image_size  = (width, height)
+#     with open(file_path, 'rb') as f:
+#     binary_buffer = f.read()
+#     bytes_io = io.BytesIO(binary_buffer)
+#     image = Image.frombytes('I;16', image_size, bytes_io.read())
+#     image.show()
+
+
+
+def read_bin_file(fname, Size=(640, 480), bpp=16):
+    """Reads a binary file and returns it as a NumPy array.
+
+    Args:
+        fname (str): The name of the file to read.
+        Size (tuple): The size of the image (width, height).
+        bpp (int): The number of bits per pixel.
+
+    Returns:
+        np.ndarray: The image data as a NumPy array.
+    """
+
+    try:
+        f = open(fname, 'rb')
+    except IOError:
+        print("Error: Could not open file", fname)
+        return None
+
+    if bpp > 32:
+        dtype = np.uint64
+    elif bpp > 16:
+        dtype = np.uint32
+    elif bpp > 8:
+        dtype = np.uint16
+    else:
+        dtype = np.uint8
+
+    A = np.fromfile(f, dtype=dtype, count=Size[0] * Size[1]).reshape(Size[::-1])
+
+    if bpp > 8:
+        A = np.bitwise_and(A, 2**bpp - 1)
+
+    f.close()
+
+    return A
+
+def test_read_bin():
+    "test bin file reading"
+    fpath       = r"C:\Data\Safety\AGV\240__static_hall_carpet_fluorescent\240__static_hall_carpet_fluorescent\device_0_sensor_0_Infrared_1_image_data\image_1727253111630055904_1280x720_step_1280_8uc1.bin"
+    fsize       = (1280,720)
+    fbpp        = 8
+    img_array   = read_bin_file(fpath,fsize,fbpp)
+    vis     = cv.cvtColor(img_array, cv.COLOR_GRAY2RGB)
+    cv.imshow('Infrared', vis)
+
+
+    fpath       = r"C:\Data\Safety\AGV\240__static_hall_carpet_fluorescent\240__static_hall_carpet_fluorescent\device_0_sensor_0_Depth_0_image_data\image_1727253111694310904_1280x720_step_2560_mono16.bin"
+    fsize       = (1280,720)
+    fbpp        = 16
+    img_array   = read_bin_file(fpath,fsize,fbpp)
+    depth_scaled        = cv.convertScaleAbs(img_array, alpha=0.03)
+    depth_colormap      = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)
+
+    cv.imshow('Depth', depth_colormap)
+
+
+    ch  = cv.waitKey()
+
+
 def main():
+    
     args = parse_cli_args()
 
     inputPath = args.input
@@ -104,4 +184,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    #main()
+    #print_topics()
+    test_read_bin()
