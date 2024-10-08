@@ -20,7 +20,9 @@ def parse_cli_args():
         "--input",
         type=str,
         help="Input bag path (folder or filepath) to read from",
-        default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent.bag",
+        #default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent.bag",
+        #default=r"C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet.bag",
+        default=r"C:\Data\Safety\AGV\12_static_no_prj_covered_hall_carpet.bag",
         required=False,
     )
     parser.add_argument(
@@ -28,7 +30,9 @@ def parse_cli_args():
         "--output",
         type=str,
         help="Output path for serialized data",
-        default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent",
+        #default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent",
+        #default=r"C:\\Data\\Safety\\AGV\\12_static_both_prj_covered_hall_carpet",
+        default=r"C:\\Data\\Safety\\AGV\\12_static_no_prj_covered_hall_carpet",
         required=False,
     )
     parser.add_argument(
@@ -154,7 +158,7 @@ def test_read_bin():
     fsize       = (1280,720)
     fbpp        = 8
     img_array   = read_bin_file(fpath,fsize,fbpp)
-    vis     = cv.cvtColor(img_array, cv.COLOR_GRAY2RGB)
+    vis         = cv.cvtColor(img_array, cv.COLOR_GRAY2RGB)
     cv.imshow('Infrared', vis)
 
 
@@ -184,6 +188,6 @@ def main():
 
 
 if __name__ == '__main__':
-    #main()
+    main()
     #print_topics()
-    test_read_bin()
+    #test_read_bin()

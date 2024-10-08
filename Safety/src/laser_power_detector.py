@@ -30,11 +30,15 @@ import sys
 sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
 from common import log, RectSelector
+from extract_images_from_ros1bag import read_bin_file
 
 
 # see update function
 ESTIMATOR_OPTIONS = {1:'std',2:'std integrated',3:'contrast',4:'contrast',5:'contrast maxim',
-                     11:'saturate',12:'texture', 21:'laser on-off', 31:'iir', 41:'dft-filter', 42:'spatial-filter'}
+                     11:'saturate',12:'texture', 21:'laser on-off', 
+                     31:'iir', 
+                     41:'dft-filter', 42:'spatial-filter',
+                     51:'rosbag'}
 
         
 #import logging as log
@@ -65,16 +69,19 @@ class DataSource:
         self.roi             = [0,0,self.frame_size[1],self.frame_size[0]]
 
         self.video_src       = None   # video source
+        self.video_src2      = None   # video source 2 for two ros bags
 
         self.first_time      = True   # help to deal with initialization
         self.frame_count     = 0      # count frames
         
+        self.frame_color     = None   # multiple channels - colors
         self.frame_gray      = None   # process separate channels
         self.frame_depth     = None   # process separate channels
         self.frame_left      = None   # raw video left frame
-        self.frame_right     = None   # raw video right frame
+        self.frame_right     = None   # raw video right frame or previous left
         self.frame_show      = None   # show video frame
         self.figure_name     = 'Input'# figure name to show
+        #self.frame_left2     = None   # left frame with previous pattern On-Off tests
 
         self.tprint('Source is defined')
 
@@ -97,6 +104,23 @@ class DataSource:
             fname           = r"C:\Users\udubin\Documents\Projects\Safety\data\laser_power\video_ii2_001_ponoff.mp4"
             fmode           = 'ii2'  
             self.video_src  = cv.VideoCapture(fname)
+
+        elif video_type == 31:
+            "pattern on - off from bag files"
+            fname           = r"C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data\image_1726733151866586685_1280x720_step_1280_8uc1.bin"           
+            self.video_src  = fname
+            fname           = r"C:\Data\Safety\AGV\12_static_no_prj_covered_hall_carpet\12_static_no_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data\image_1726732880805986404_1280x720_step_1280_8uc1.bin"
+            self.video_src2 = fname
+            fmode           = 'img'  
+
+        elif video_type == 32:
+            "pattern on - off from bag files"
+            fname           = r"C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data\image_1726733188232460976_1280x720_step_1280_8uc1.bin"           
+            self.video_src  = fname
+            fname           = r"C:\Data\Safety\AGV\12_static_no_prj_covered_hall_carpet\12_static_no_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data\image_1726732911605116129_1280x720_step_1280_8uc1.bin"
+            self.video_src2 = fname
+            fmode           = 'img' 
+
         else:
             self.tprint(f'Video type {video_type} is not supported','E')
             raise ValueError
@@ -145,52 +169,62 @@ class DataSource:
             raise ValueError('bad mode')
 
         return True
+    
+    def get_image(self):
+        "get a 2 infrared image frame from 2 files"
+        
+        fsize               = (1280,720)
+        fbpp                = 8
 
-    def get_frame(self, roi_type = 0):
+        fname               = self.video_src 
+        img_array           = read_bin_file(fname,fsize,fbpp)
+        self.frame_left     = img_array 
+
+        fname               = self.video_src2 
+        img_array           = read_bin_file(fname,fsize,fbpp)
+        self.frame_right    = img_array     
+
+        self.frame_gray     = self.frame_right - self.frame_left    
+        self.frame_color    = np.stack((self.frame_left , self.frame_right, self.frame_left  ), axis = 2)
+ 
+        frame_out            = self.frame_color # stam
+        self.first_time      = True
+        self.frame_count     = self.frame_count + 1
+        return True, frame_out.astype(np.float32)      
+
+    def get_frame(self):
         "get a single frame from the stream"
         # as the video frame.
         ret, frame              = self.video_src.read()  
         if not ret:
             return ret, []
-        
-        # # first time - inint some stuff
-        # if self.first_time:
-        #     self.frame_size     = frame.shape[:2]
-        #     self.roi            = self.init_roi(roi_type)
-        
-        # # reduce image size
-        # x0,y0,x1,y1             = self.roi
-        # frame                   = frame[y0:y1,x0:x1,:]
                 
         # convert channels
-        ret                 = self.convert_frame_from_input(frame)
-
-        # # number of channels
-        # if self.first_time:    
-        #     self.channel_num = 1 if len(frame_out.shape) < 3 else frame_out.shape[2]
-
-        #self.frame_gray      = frame_gray.astype(np.float32)   # process separate channels
-        #self.frame_depth     = frame_depth.astype(np.float32)   # process separate channels  
+        ret                     = self.convert_frame_from_input(frame)
+ 
         frame_out            = frame
         self.first_time      = False
         self.frame_count     = self.frame_count + 1
         return True, frame_out.astype(np.float32)   
     
     def get_data(self):
-        "get all the data strcutures"
+        "get all the data structures"
         #self.first_time     = True
         #self.frame_count    = 0
         #self.integration_enb = True   # enable integration process
 
-        ret, frame          = self.get_frame()  
+        if self.mode == 'img':
+            # read image data
+            ret, frame          = self.get_image()
+
+        else: 
+            # read video data
+            ret, frame          = self.get_frame()  
+
         if not ret:
-            self.tprint(f'Video source is not found ','E')
+            self.tprint(f'Data source is not found ','E')
             return ret
 
-        #self.frame_gray_int  = self.frame_gray   # process separate channels
-        #self.frame_depth_int = self.frame_depth   # process separate channels
-
-        #self.tprint('Detector is initialized')
         return ret    
 
     def show_data(self):
@@ -200,7 +234,11 @@ class DataSource:
             return False
             
         # deal with black and white
-        img_show = np.concatenate((self.frame_left, self.frame_right), axis = 1)
+        #img_show    = np.concatenate((self.frame_left, self.frame_right), axis = 1)
+        img_show    = self.frame_color
+
+        while img_show.shape[1] > 2000:
+            img_show    = cv.resize(img_show, (img_show.shape[1]>>1,img_show.shape[0]>>1), interpolation=cv.INTER_LINEAR)
 
         cv.imshow('Image L-R', img_show)
         #self.tprint('show done')
@@ -302,6 +340,9 @@ class LaserPowerEstimator:
         elif convert_type == 2:
             "is coming from iir"
             frame_out    = frame[:,:,1] - frame[:,:,2]
+        elif convert_type == 3:
+            "is coming from ros bags"
+            frame_out    = frame[:,:,0] - frame[:,:,1]            
         else:
             self.tprint('bad convert_type','E') 
             frame_out    = frame[:,:,0]       
@@ -510,10 +551,14 @@ class LaserPowerEstimator:
                     
             img_roi     = self.preprocess(frame)        
             psnr        = self.estimate_dot_pattern_spatial(img_roi)    
-            self.good   = psnr > 0.8              
-      
+            self.good   = psnr > 0.8  
 
-                                              
+        elif self.estimator_type == 51: # ros bag images in left and right        
+        
+            frame_gray  = self.convert_frame_to_gray(frame, convert_type = 3)
+            img_roi     = self.preprocess(frame_gray)        
+            psnr        = self.estimate_percentile_simple(img_roi)    
+            self.good   = psnr > 0.8                       
 
         self.psr        = psnr
         self.img        = img_roi   # for debug
@@ -779,6 +824,37 @@ class TestPowerEstimator(unittest.TestCase):
         p.finish()
         self.assertTrue(not ret)         
 
+    def test_rosbag_data_show(self):
+        "image data with on off of two frames"
+        srcid   = 31       # video tytpe
+
+        d       = DataSource()
+        ret     = d.init_video(srcid)
+        ret     = d.get_data()
+        ret     = d.show_data() 
+        cv.waitKey()
+        self.assertTrue(not ret)      
+
+    def test_rosbag_data_with_pattern_switch(self):
+        "image data with on off of two frames"
+        srcid   = 32       # ros bag 31,32
+        #rect    = (280,200,360,280)
+        rect    = (700,50,780,100)
+        estid   = 51       # estimator id
+
+        d       = DataSource()
+        p       = LaserPowerEstimator(estimator_type = estid)
+        ret     = d.init_video(srcid)
+        retp    = p.init_roi(rect)
+
+        ret     = d.get_data()
+        retp    = p.update(d.frame_color)
+        ret     = p.show_scene(d.frame_color) 
+        reti    = p.show_internal_state()
+        cv.waitKey()
+        p.finish()
+        self.assertTrue(not ret)         
+
 # --------------------------------
 #%% App
 class RunApp:
@@ -896,13 +972,18 @@ def RunTest():
     #suite.addTest(TestPowerEstimator("test_data_source_video")) # ok
     #suite.addTest(TestPowerEstimator("test_video_std")) # ok
     #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
-    suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
+    #suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
+
+    #suite.addTest(TestPowerEstimator("test_rosbag_data_show")) # ok
+    suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
+    
+    
     runner = unittest.TextTestRunner()
     runner.run(suite)
 
 if __name__ == '__main__':
     #print(__doc__)
 
-    #RunTest()
-    RunApp('iig').run()    
+    RunTest()
+    #RunApp('iig').run()    
 
