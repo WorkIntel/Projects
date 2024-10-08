@@ -16,7 +16,7 @@ Environemt :
     C:\\Users\\udubin\\Documents\\Envs\\barcode
 
 Install : 
-
+    See README.md
 
 
 '''
@@ -34,7 +34,7 @@ from common import log, RectSelector
 
 # see update function
 ESTIMATOR_OPTIONS = {1:'std',2:'std integrated',3:'contrast',4:'contrast',5:'contrast maxim',
-                     11:'saturate',12:'texture', 21:'laser on-off', 31:'iir'}
+                     11:'saturate',12:'texture', 21:'laser on-off', 31:'iir', 41:'dft-filter', 42:'spatial-filter'}
 
         
 #import logging as log
@@ -256,6 +256,9 @@ class LaserPowerEstimator:
         self.img_int_mean    = None   # mean integrated image
         self.img_int_std     = None   # std integrated image
 
+        # dft and filters
+        self.img_roi_dft     = None   # complex fft of the roi
+
         # position and status
         self.img             = None   # original roi image patch
         self.pos             = (1,1)  # center of the roi
@@ -317,14 +320,16 @@ class LaserPowerEstimator:
         img_roi           = img_roi #*self.win
         return img_roi    
     
-    def estimate_contrast_simple(self, img_roi, percent = 0.1):
+    def estimate_percentile_simple(self, img_roi, percent = 0.1):
         "estimate percentile of ythe ROI. Mean on low and max percent of the image. Returns 1 if high contrast"
         assert percent > 0 and percent < 0.5 , 'percentile must be between 0 and 0.5'
         img_sorted          = np.sort(img_roi, axis=None)
-        cut_ind             = int(len(img_sorted)*percent)
+        cut_ind             = np.ceil(len(img_sorted)*percent).astype(np.int32)
         low_val             = np.mean(img_sorted[:cut_ind])
-        high_val            = np.mean(img_sorted[-cut_ind:])
-        prob                = 1- (low_val)/(high_val + 1e-9)
+        high_val            = np.mean(img_sorted[-cut_ind:])  # point peaks
+        #prob                = 1- (low_val)/(high_val + 1e-9)
+        prob                = 1 - np.exp(-(high_val - low_val)/10)
+        #self.tprint('Estim diff : %s' %str(high_val - low_val))
         return prob 
 
     def estimate_contrast_maxim(self, img_roi, percent = 0.1):
@@ -337,9 +342,9 @@ class LaserPowerEstimator:
     
     def estimate_contrast_std(self, img_roi):
         "makes  over ROI and estimaytes roi std. Mean/STD is an output. Returns 1 if high contrast"
-        err_std             = img_roi.std() + 1
+        err_std             = img_roi.std() #+ 1
         #psnr                = img_roi.mean()/err_std
-        prob                = 1-1/err_std
+        prob                = 1-np.exp(-err_std/5) #1/(1+err_std)
         return prob    
 
     def estimate_integrated_image_psnr(self, img_roi, rate = 0.1):
@@ -372,7 +377,7 @@ class LaserPowerEstimator:
         self.img_dbg        = img_diff  # debug
         return psnr 
 
-    def estimate_saturated_probability(self, img_roi):
+    def estimate_saturation_probability(self, img_roi):
         "estimates probability of the saturation. Returns 1 if saturated"
         assert img_roi.max() < 257, 'image values must be in the ramge 0-255'
         img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
@@ -382,13 +387,58 @@ class LaserPowerEstimator:
     def estimate_texture_probability(self, img_roi):
         "estimates probability of the edge textures and edges. Returns 1 if high edge probability or texture"
         assert img_roi.max() < 257, 'image values must be in the ramge 0-255'
-        img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
-        img_dx              = img_roi[:,2:] - img_roi[:,:-2]
-        img_dy              = img_roi[2:,:] - img_roi[:-2,:]
-        img_edge            = np.abs(img_dx[2:,:]) + np.abs(img_dy[:,2:]) 
+        #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        s                   = 2
+        img_dx              = img_roi[:,s:] - img_roi[:,:-s]
+        img_dy              = img_roi[s:,:] - img_roi[:-s,:]
+        img_edge            = np.abs(img_dx[s:,:]) + np.abs(img_dy[:,s:]) 
         # edge noticable difference is around 7
-        prob                = np.minimum(1,img_edge.mean()/10)
+        #prob                = np.minimum(1,img_edge.mean()/10)
+        self.img_dbg        = np.zeros_like(img_roi)
+        self.img_dbg[s:,s:] = img_edge  
+        prob                = self.estimate_percentile_simple(img_edge, percent = 0.1)  
         return prob      
+
+    def estimate_dot_pattern_dft(self, img_roi):
+        "Detects dots in the image using dft. Returns 1 if dots are found"
+        h, w                = img_roi.shape
+
+        # init dot pattern and create freq filter
+        if self.img_roi_dft is None:
+            g                   = np.zeros((h, w), np.float32)
+            g[h//2, w//2]       = 1
+            g                   = cv.GaussianBlur(g, (-1, -1), 1.0)
+            g                  /= g.max()
+            g                  -= g.mean()
+            self.img_roi_dft    = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
+
+        # correlate
+        #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        A                   = cv.dft(img_roi, flags=cv.DFT_COMPLEX_OUTPUT)
+        C                   = cv.mulSpectrums(A, self.img_roi_dft, 0, conjB=True)
+        resp                = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
+        resp                = np.fft.fftshift(resp) # Shift the zero-frequency component to the center  
+        resp                = resp - resp.min()
+        self.img_dbg        = resp  
+        prob                = self.estimate_percentile_simple(resp, percent = 0.1)    
+        return prob  
+
+    def estimate_dot_pattern_spatial(self, img_roi):
+        "Detects dots in the image using gauss hat filter. Returns 1 if dots are found"
+        assert img_roi.max() < 256, 'image values must be in the ramge 0-255'
+        h, w                = img_roi.shape
+
+        # check if needed
+        #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        s                   = 1
+        img_dx              = img_roi[s:-s,(s*2):] + img_roi[s:-s,:-(s*2)]
+        img_dy              = img_roi[(s*2):,s:-s] + img_roi[:-(s*2),s:-s]
+        img_dot             = 4*img_roi[s:-s,s:-s] - img_dx - img_dy
+
+        self.img_dbg        = np.zeros_like(img_roi)
+        self.img_dbg[s:-s,s:-s]        = img_dot  
+        prob                = self.estimate_percentile_simple(img_dot, percent = 0.1)    
+        return prob  
 
     def update(self, frame, rate = 0.1):
         "select differnet estimation techniques"
@@ -397,7 +447,7 @@ class LaserPowerEstimator:
             self.tprint('Define ROI')
             return ret
         
-        if self.estimator_type == 1: # simple mean / std
+        if self.estimator_type == 1: # simple 1 / std - ok
 
             img_roi     = self.preprocess(frame)
             psnr        = self.estimate_contrast_std(img_roi)
@@ -409,16 +459,16 @@ class LaserPowerEstimator:
             psnr        = self.estimate_integrated_image_psnr(img_roi, rate)
             self.good   = psnr > 0.8
 
-        elif self.estimator_type == 3: # simple mean / std        
+        elif self.estimator_type == 3: # simple max - min of the percentile        
         
             img_roi     = self.preprocess(frame)        
-            psnr        = self.estimate_contrast_simple(img_roi, 0.1)
+            psnr        = self.estimate_percentile_simple(img_roi, 0.05)
             self.good   = psnr > 0.8
             
         elif self.estimator_type == 4: # percentile        
         
             img_roi     = self.preprocess(frame)        
-            psnr        = self.estimate_contrast_simple(img_roi, 0.3) 
+            psnr        = self.estimate_percentile_simple(img_roi, 0.3) 
             self.good   = psnr > 0.8
 
         elif self.estimator_type == 5: # percentile        
@@ -427,13 +477,13 @@ class LaserPowerEstimator:
             psnr        = self.estimate_contrast_maxim(img_roi, 0.1)  
             self.good   = psnr > 0.8
 
-        elif self.estimator_type == 11: # saturation probability        
+        elif self.estimator_type == 11: # saturation probability  - ok      
         
             img_roi     = self.preprocess(frame)        
-            psnr        = self.estimate_saturated_probability(img_roi) 
+            psnr        = self.estimate_saturation_probability(img_roi) 
             self.good   = psnr > 0.8     
 
-        elif self.estimator_type == 12: # edge probability        
+        elif self.estimator_type == 12: # edge probability    - ok    
         
             img_roi     = self.preprocess(frame)        
             psnr        = self.estimate_texture_probability(img_roi)    
@@ -448,7 +498,20 @@ class LaserPowerEstimator:
         
             frame_gray  = self.convert_frame_to_gray(frame, convert_type = 1)
             img_roi     = self.preprocess(frame_gray)        
-            psnr        = self.estimate_contrast_simple(img_roi)             
+            psnr        = self.estimate_percentile_simple(img_roi)  
+
+        elif self.estimator_type == 41: # dot pattern   
+                    
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_dot_pattern_dft(img_roi)    
+            self.good   = psnr > 0.8  
+
+        elif self.estimator_type == 42: # dot pattern using  spatial mask
+                    
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_dot_pattern_spatial(img_roi)    
+            self.good   = psnr > 0.8              
+      
 
                                               
 
@@ -719,7 +782,7 @@ class TestPowerEstimator(unittest.TestCase):
 # --------------------------------
 #%% App
 class RunApp:
-    def __init__(self, video_src = 'iir'):
+    def __init__(self, video_src = 'iir', estimator_type = 41):
 
         #self.cap = video.create_capture(video_src)
         self.cap        = RealSense(video_src)
@@ -734,7 +797,7 @@ class RunApp:
         self.trackers   = []
         self.paused     = False
         self.update_rate= 0 
-        self.estim_type = 1
+        self.estim_type = estimator_type
 
     def get_frame(self, frame_type = 0):
         "extracts gray frame"
@@ -755,11 +818,25 @@ class RunApp:
 
         return frame_gray  
 
-    def switch_estimator(self):
-        "gets the next estimator"        
-        estim           = list(ESTIMATOR_OPTIONS.keys())
-        ind             = estim.index(self.estim_type)
-        self.estim_type = estim[(ind + 1) % len(estim) ] 
+    def switch_estimator(self, ch = None):
+        "gets the next estimator"      
+        if ch is None:  
+            estim           = list(ESTIMATOR_OPTIONS.keys())
+            ind             = estim.index(self.estim_type)
+            self.estim_type = estim[(ind + 1) % len(estim) ] 
+        elif ch == 1:
+            self.estim_type = 1
+        elif ch == 2:
+            self.estim_type = 3     
+        elif ch == 3:
+            self.estim_type = 11          
+        elif ch == 4:
+            self.estim_type = 12  
+        elif ch == 5:
+            self.estim_type = 41    
+        elif ch == 6:
+            self.estim_type = 42                                                 
+
         print(f'Estimator {ESTIMATOR_OPTIONS[self.estim_type]} with id {self.estim_type} is enabled')       
 
     def on_rect(self, rect):
@@ -807,7 +884,8 @@ class RunApp:
                 self.cap.switch_projector()   
             elif ch == ord('n'):  # switch estimator types one by one
                 self.switch_estimator()
-                          
+            elif 48 < ch and ch < 58 : #in [ord('1'), ord('2'), ord('3'), ord('4'), ord('5')] :  # switch estimator types one by one
+                self.switch_estimator(ch - 48)         # start from 1                 
 
 # --------------------------------
 #%% Run Test
