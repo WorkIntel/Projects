@@ -305,6 +305,7 @@ class LaserPowerEstimator:
         self.psr             = 0      # laser power / noise ratio
         self.rect            = None   # adjusted rectangle
         self.img_dbg         = None   # debug  image
+        self.win             = None   # for DFT method
 
         estimator_name      = ESTIMATOR_OPTIONS[self.estimator_type]
         self.tprint(f'New power estimator {estimator_name} and id {estimator_id} is defined')
@@ -444,25 +445,37 @@ class LaserPowerEstimator:
     def estimate_dot_pattern_dft(self, img_roi):
         "Detects dots in the image using dft. Returns 1 if dots are found"
         h, w                = img_roi.shape
+        # check if needed
+        img_roi             = np.log2(img_roi + 1.0)*32 
 
         # init dot pattern and create freq filter
         if self.img_roi_dft is None:
             g                   = np.zeros((h, w), np.float32)
             g[h//2, w//2]       = 1
             g                   = cv.GaussianBlur(g, (-1, -1), 1.0)
-            g                  /= g.max()
-            g                  -= g.mean()
+            g                   = img_roi
+            #g                  -= g.mean()
+            #g                  /= g.max()
             self.img_roi_dft    = cv.dft(g, flags=cv.DFT_COMPLEX_OUTPUT)
+            self.win            = cv.createHanningWindow((w, h), cv.CV_32F)
 
         # correlate
         #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
         A                   = cv.dft(img_roi, flags=cv.DFT_COMPLEX_OUTPUT)
+        A[:,:,0],A[:,:,1] = A[:,:,0]*self.win,A[:,:,1]*self.win # no dc
         C                   = cv.mulSpectrums(A, self.img_roi_dft, 0, conjB=True)
         resp                = cv.idft(C, flags=cv.DFT_SCALE | cv.DFT_REAL_OUTPUT)
         resp                = np.fft.fftshift(resp) # Shift the zero-frequency component to the center  
-        resp                = resp - resp.min()
+        #resp                = resp - resp.min()
         self.img_dbg        = resp  
-        prob                = self.estimate_percentile_simple(resp, percent = 0.1)    
+        #prob                = self.estimate_contrast_maxim(resp, percent = 0.03)  
+        # 
+        _, mval, _, (mx, my) = cv.minMaxLoc(resp)
+        side_resp           = resp.copy()
+        cv.rectangle(side_resp, (mx-9, my-9), (mx+9, my+9), 0, -1)
+        smean, sstd         = side_resp.mean(), side_resp.std()
+        psr                 = (mval-smean) / (sstd+1e-9)  
+        prob                = 1 - np.exp(-psr/8)
         return prob  
 
     def estimate_dot_pattern_spatial(self, img_roi):
@@ -962,7 +975,8 @@ class RunApp:
             elif ch == ord(' '):
                 self.paused = not self.paused
             elif ch == ord('c'):
-                self.trackers.pop()
+                if len(self.trackers) > 0:
+                    self.trackers.pop()
             elif ch == ord('u'):  
                 self.update_rate = 0.1 if self.update_rate < 0.001 else 0  
             elif ch == ord('p'):
