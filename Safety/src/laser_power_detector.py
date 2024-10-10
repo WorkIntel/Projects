@@ -917,17 +917,17 @@ class RunApp:
             ind             = estim.index(self.estim_type)
             self.estim_type = estim[(ind + 1) % len(estim) ] 
         elif ch == 1:
-            self.estim_type = 1
+            self.estim_type = 1 # simple 1 / std - ok
         elif ch == 2:
-            self.estim_type = 3     
+            self.estim_type = 3  # percentile 
         elif ch == 3:
-            self.estim_type = 11          
+            self.estim_type = 11  # saturation        
         elif ch == 4:
-            self.estim_type = 12  
+            self.estim_type = 12  # edge texture
         elif ch == 5:
-            self.estim_type = 41    
+            self.estim_type = 41  # many do pattern  
         elif ch == 6:
-            self.estim_type = 42       
+            self.estim_type = 42  # single dot     
         elif ch == 7:
             self.estim_type = 21                                                       
 

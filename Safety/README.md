@@ -6,7 +6,7 @@
 
 # Introduction
 
-This code provides examples of the using RealSense camera for monitoring and detection of objects entering a predefined zones.
+This code provides examples of the using RealSense camera for monitoring and detection of objects entering a predefined zones. 
 The code can use both RGB and Depth information to estimate backgrounnd.
 The following functions are supported:
 
@@ -15,6 +15,10 @@ The following functions are supported:
 
 Theis code could be integrated in your robotics and video processing pipe line.
  
+# Laser Power Monitor
+
+The camera can monitor the presence of the laser. It deployes multiple features to estimate the presence of laser power.
+![](doc/motion_detection-ezgif.com-video-to-gif-converter.gif)
 
 ## Installation Windows
 
