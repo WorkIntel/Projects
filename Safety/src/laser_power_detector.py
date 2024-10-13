@@ -368,9 +368,9 @@ class LaserPowerEstimator:
         img_sorted          = np.sort(img_roi, axis=None)
         cut_ind             = np.ceil(len(img_sorted)*percent).astype(np.int32)
         low_val             = np.mean(img_sorted[:cut_ind])
-        high_val            = np.mean(img_sorted[-cut_ind:])  # point peaks
+        high_val            = np.mean(img_sorted[-5:])  # point peaks
         #prob                = 1- (low_val)/(high_val + 1e-9)
-        prob                = 1 - np.exp(-(high_val - low_val)/10)
+        prob                = 1 - np.exp(-(high_val - low_val)/3)
         #self.tprint('Estim diff : %s' %str(high_val - low_val))
         return prob 
 
@@ -488,11 +488,11 @@ class LaserPowerEstimator:
         s                   = 1
         img_dx              = img_roi[s:-s,(s*2):] + img_roi[s:-s,:-(s*2)]
         img_dy              = img_roi[(s*2):,s:-s] + img_roi[:-(s*2),s:-s]
-        img_dot             = 4*img_roi[s:-s,s:-s] - img_dx - img_dy
+        img_dot             = img_roi[s:-s,s:-s] - (img_dx + img_dy)/4
 
         self.img_dbg        = np.zeros_like(img_roi)
         self.img_dbg[s:-s,s:-s]        = img_dot  
-        prob                = self.estimate_percentile_simple(img_dot, percent = 0.1)    
+        prob                = self.estimate_percentile_simple(img_dot, percent = 0.3)    
         return prob  
 
     def update(self, frame, rate = 0.1):
@@ -619,7 +619,7 @@ class LaserPowerEstimator:
     def show_internal_state(self):
         "shows some internal info"
         imgin           = np.uint8(self.img)
-        f               = self.img - self.img.mean()
+        f               = self.img # - self.img.mean()
         kernel          = np.uint8((f-f.min()) / f.ptp()*255 )
         r               = self.img_dbg
         resp            = np.uint8((r-r.min()) / r.ptp()*255) #np.clip(resp/resp.max(), 0, 1)*255)

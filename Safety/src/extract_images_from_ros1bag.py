@@ -22,7 +22,7 @@ def parse_cli_args():
         help="Input bag path (folder or filepath) to read from",
         #default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent.bag",
         #default=r"C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet.bag",
-        default=r"C:\Data\Safety\AGV\12_static_no_prj_covered_hall_carpet.bag",
+        default=r"C:\Data\Safety\AGV\12_in_motion_both_prj_hall_ceramic_tile_sun.bag",
         required=False,
     )
     parser.add_argument(
@@ -32,7 +32,7 @@ def parse_cli_args():
         help="Output path for serialized data",
         #default="C:\\Data\\Safety\\AGV\\240__static_hall_carpet_fluorescent",
         #default=r"C:\\Data\\Safety\\AGV\\12_static_both_prj_covered_hall_carpet",
-        default=r"C:\\Data\\Safety\\AGV\\12_static_no_prj_covered_hall_carpet",
+        default=r"C:\\Data\\Safety\\AGV",
         required=False,
     )
     parser.add_argument(
@@ -47,7 +47,6 @@ def parse_cli_args():
     )
     args = parser.parse_args()
     return args
-
 
 def get_friendly_topic_name(topic):
     ''' Generates a topic name that doesn't contain forward slashes '''
@@ -100,22 +99,6 @@ def extract_from_rosbag(args, filepath):
             else:
                 print(f"I don't know how to parse topic: {connection.topic}")
 
-
-# def bin_two_image():
-#     from PIL import Image
-#     import io
-#     width       = 640
-#     height      = 360
-#     file_path   = 'path_to_your_image_file.bin'
-#     image_size  = (width, height)
-#     with open(file_path, 'rb') as f:
-#     binary_buffer = f.read()
-#     bytes_io = io.BytesIO(binary_buffer)
-#     image = Image.frombytes('I;16', image_size, bytes_io.read())
-#     image.show()
-
-
-
 def read_bin_file(fname, Size=(640, 480), bpp=16):
     """Reads a binary file and returns it as a NumPy array.
 
@@ -152,6 +135,17 @@ def read_bin_file(fname, Size=(640, 480), bpp=16):
 
     return A
 
+def extract_bag():
+    
+    args = parse_cli_args()
+
+    inputPath = args.input
+    if os.path.isdir(inputPath):
+        for name in os.listdir(inputPath):
+            extract_from_rosbag(args, os.path.join(inputPath, name))
+    else:
+        extract_from_rosbag(args, args.input)
+
 def test_read_bin():
     "test bin file reading"
     fpath       = r"C:\Data\Safety\AGV\240__static_hall_carpet_fluorescent\240__static_hall_carpet_fluorescent\device_0_sensor_0_Infrared_1_image_data\image_1727253111630055904_1280x720_step_1280_8uc1.bin"
@@ -170,24 +164,38 @@ def test_read_bin():
     depth_colormap      = cv.applyColorMap(depth_scaled, cv.COLORMAP_JET)
 
     cv.imshow('Depth', depth_colormap)
-
-
     ch  = cv.waitKey()
 
-
-def main():
+def read_and_show_infrared():
+    "multiple bin file reading of the infrared data"
+    fpath       = r"C:\Data\Safety\AGV\12_in_motion_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data"
+    fpath       = r"C:\Data\Safety\AGV\12_in_motion_no_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data"
+    fpath       = r"C:\Data\Safety\AGV\12_in_motion_both_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data"
+    fsize       = (1280,720)
+    fbpp        = 8
     
-    args = parse_cli_args()
 
-    inputPath = args.input
-    if os.path.isdir(inputPath):
-        for name in os.listdir(inputPath):
-            extract_from_rosbag(args, os.path.join(inputPath, name))
-    else:
-        extract_from_rosbag(args, args.input)
+    # Filter for files with specific extensions (optional)
+    files       = os.listdir(fpath)
+    file_extensions = [".bin"]
+    filtered_files = [file for file in files if os.path.isfile(os.path.join(fpath, file)) and file.endswith(tuple(file_extensions))]
+
+    # Iterate over files and process them
+    for file in filtered_files:
+        file_path   = os.path.join(fpath, file)
+        img_array   = read_bin_file(file_path,fsize,fbpp)
+        vis         = cv.cvtColor(img_array, cv.COLOR_GRAY2RGB)
+        cv.imshow('Infrared q-quit', vis)
+        ch  = cv.waitKey(100)
+        if ch == 27 or ch == ord('q'):
+            break  
+
+    print('Done')
+
 
 
 if __name__ == '__main__':
-    main()
+    #extract_bag()
     #print_topics()
     #test_read_bin()
+    read_and_show_infrared()
