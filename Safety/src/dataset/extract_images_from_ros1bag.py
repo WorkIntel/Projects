@@ -171,6 +171,8 @@ def read_and_show_infrared():
     fpath       = r"C:\Data\Safety\AGV\12_in_motion_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data"
     fpath       = r"C:\Data\Safety\AGV\12_in_motion_no_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data"
     fpath       = r"C:\Data\Safety\AGV\12_in_motion_both_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data"
+    fpath       = r"C:\Data\Safety\AGV\12_in_motion_no_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data"
+    fpath       = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\on'
     fsize       = (1280,720)
     fbpp        = 8
     
@@ -186,9 +188,14 @@ def read_and_show_infrared():
         img_array   = read_bin_file(file_path,fsize,fbpp)
         vis         = cv.cvtColor(img_array, cv.COLOR_GRAY2RGB)
         cv.imshow('Infrared q-quit', vis)
+        print(file_path.split('\\')[-1])
         ch  = cv.waitKey(100)
         if ch == 27 or ch == ord('q'):
             break  
+        elif ch == ord(' '):
+            print('Pause ....')
+            ch  = cv.waitKey()
+
 
     print('Done')
 

@@ -34,23 +34,13 @@ import sys
 sys.path.append(r'..\Utils\src')
 from common import log, RectSelector
 sys.path.append(r'..\Safety\src')
-from extract_images_from_ros1bag import read_bin_file
+from dataset.extract_images_from_ros1bag import read_bin_file
+
+import numbers
+from numpy.lib.stride_tricks import as_strided
 
 # --------------------------------
 #%% Help Fun
-def MeanIoU(y_pred, y_true):
-     # ytrue, ypred is a flatten vector
-     y_pred = y_pred.flatten()
-     y_true = y_true.flatten()
-     current = confusion_matrix(y_true, y_pred, labels=[0, 1])
-     # compute mean iou
-     intersection = np.diag(current)
-     ground_truth_set = current.sum(axis=1)
-     predicted_set = current.sum(axis=0)
-     union = ground_truth_set + predicted_set - intersection
-     IoU = intersection / union.astype(np.float32)
-     return np.mean(IoU)
-
 def extract_patches(image, patch_size):
     """Extracts patches from an image.
 
@@ -71,9 +61,6 @@ def extract_patches(image, patch_size):
             patches.append(patch)
 
     return patches
-
-import numbers
-from numpy.lib.stride_tricks import as_strided
 
 def view_as_windows(arr_in, window_shape, step=1):
     """Rolling window view of the input n-dimensional array.
@@ -240,7 +227,8 @@ class DataSource:
         self.frame_size      = (480,640)
         self.roi             = None #[0,0,self.frame_size[1],self.frame_size[0]]
         self.patch_size      = (16, 16)  # h,w - patch to extract pixels from
-        self.point_size      = (3,3)     # h,w - for mask
+        #elf.point_size      = (3,3)     # h,w - for mask
+        self.patch_step      = 2       # step between patches
 
         self.video_src       = None   # video source
         self.file_list       = None   # contrains bin file list
@@ -430,12 +418,12 @@ class DataSource:
         patch_shape     = (h,w,ndim)
         totalPixelhNum  = np.prod(patch_shape)*nR*nC
         if totalPixelhNum > 1e4:
-            step        = 3
+            step        = 2
             self.tprint('The patch is too big or the image size is too big. Requires more than 1e8 pixels.','W')
             self.tprint('Reducing by factor 4','W')
         else:
             # compute step from the level
-            step        = 2    
+            step        = self.patch_step    
                 
         # extract patches from the fmap 
         patches_i   = view_as_windows(fmap, patch_shape, step = step).squeeze()
@@ -566,6 +554,9 @@ class DataSource:
                     pimgs,pmsks     = pimg,pmsk
                 else:
                     pimgs,pmsks     = np.vstack((pimgs,pimg)), np.vstack((pmsks,pmsk))
+
+                # debug
+                self.show_patches(img_dataset, name = dirpath.split('\\')[-1])
 
         # normalize the data to -1:1 and msks to 0:1
         pimgs               = pimgs/128 - 1
@@ -793,6 +784,21 @@ class TestDataSource(unittest.TestCase):
         xt,yt,xv,yv       = p.create_dataset(dir_paths, file_num, rois, mask_values)
         self.assertTrue(xt.shape[0] == yt.shape[0])
         self.assertTrue(xv.shape[0] == yv.shape[0])
+
+    def test_create_small_dataset(self):
+        "data set creationm from a single directory"
+        p               = DataSource()
+        file_num        = 16
+
+        dirpath1         = r'C:\Data\Safety\AGV\12_in_motion_no_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
+        dirpath2         = r'C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
+        dir_paths        = [dirpath1, dirpath2]
+        mask_values      = [0,1]
+        rois             = [(400,500,432,532), (800,500,832,532)]
+
+        xt,yt,xv,yv       = p.create_dataset(dir_paths, file_num, rois, mask_values)
+        self.assertTrue(xt.shape[0] == yt.shape[0])
+        self.assertTrue(xv.shape[0] == yv.shape[0])        
                
 
 

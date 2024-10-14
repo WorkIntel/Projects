@@ -62,19 +62,28 @@ class RoiClassifier:
     def create_model(self):
         "creates simple NN model"
         # initialize a model 
+        if self.config is None:
+            self.config     = [16, 16, 1]
         dim_input       = self.X_train.shape[1]
-        self.config     = [16, 16, 1]
+    
         self.model      = MLP(dim_input, self.config) # 2-layer neural network
         #print(self.model)
+        self.tprint("Model input dim : %s" %str(dim_input))
         self.tprint("Model config : %s" %str(self.config))
         self.tprint("Model number of parameters", len(self.model.parameters()))
 
+    def set_data(self, xt, yt, xv, yv):
+        "assign data to internal vars"
+        self.X_train, self.y_train, self.X_test, self.y_test  = xt, yt, xv, yv
+        ret = self.check_data()
+        return ret
 
     def check_data(self):
         "make sure that data is ok"
         ret1 = np.any(np.abs(self.y_train) > 0.9) # not zeros
         ret2 = np.any(np.abs(self.y_train) < 1.1) # only 1 and -1
-        return ret1 and ret2
+        ret3 = self.X_train.shape[0] == self.y_train.shape[0]
+        return ret1 and ret2 and ret3
 
     def loss(self, batch_size=None):
         # loss function
@@ -105,12 +114,17 @@ class RoiClassifier:
 
     def train(self):
         "train the model"
-        # optimization
+        # must have data loadded already
         ret = self.check_data()
         if not ret:
             self.tprint('Label data must be -1 and 1')
             return
-        
+
+        # create a new model
+        if self.model is None:
+            self.create_model()
+
+        # optimization
         for k in range(100):
             
             # forward
@@ -128,12 +142,40 @@ class RoiClassifier:
             if k % 5 == 0:
                 self.tprint(f"step {k} loss {total_loss.data}, accuracy {acc*100}%")
 
-    def predict(self, X):
+        self.tprint('Training is done!')
+        
+        # prediction
+        y_pred = self.predict(self.X_train)
+        self.tprint('Training accuracy:')
+        acc    = self.check_accuracy(self.y_train, y_pred)
+
+        return True
+
+    def predict(self, X, y = None):
         "make model prediction"
+        time_s  = time.time()
+
         inputs  = [list(map(Value, xrow)) for xrow in X]
         scores  = list(map(self.model, inputs))
-        Z       = np.array([s.data > 0 for s in scores])
-        return Z
+        y_pred  = np.array([s.data > 0 for s in scores])
+
+        self.tprint('Mean predict time : %s sec' %str((time.time() - time_s)/X.shape[0]))
+
+        # if y is given - check accuracy
+        if y is not None:
+            acc = self.check_accuracy(y, y_pred)
+
+        return y_pred
+    
+    def check_accuracy(self, y, y_pred):
+        #
+        # IOU = true_positive / (true_positive + false_positive + false_negative).
+        #num_classes         = 2
+        accuracy = [(yi > 0) == (scorei > 0) for yi, scorei in zip(y, y_pred)]
+        mres     = sum(accuracy) / len(accuracy)
+        self.tprint("Mean accuracy = %s" %str(mres*100))
+        return mres
+
 
     def save_model(self):
         "saves the model/weight to a file"
@@ -190,15 +232,7 @@ class RoiClassifier:
         plt.ylim(yy.min(), yy.max())
         plt.show()    
 
-    def check_accuracy(self, y, y_pred):
-        #
-        # IOU = true_positive / (true_positive + false_positive + false_negative).
-        #num_classes         = 2
-        accuracy = [(yi > 0) == (scorei > 0) for yi, scorei in zip(y, y_pred)]
-        mres     = sum(accuracy) / len(accuracy)
-        self.tprint("Mean accuracy = %s" %str(mres*100))
-        return mres
-        
+
     def check_images(self, fmsk, y_pred):
         # recover an image from the label
   
@@ -379,6 +413,26 @@ class TestRoiClassifier(unittest.TestCase):
         xt,yt,xv,yv       = p.create_dataset(dir_paths, file_num, rois, mask_values)
         self.assertTrue(xt.shape[0] == yt.shape[0])
         self.assertTrue(xv.shape[0] == yv.shape[0])
+
+    def test_train_small_dataset(self):
+        "data set from robot in motion - train and test"
+        d               = DataSource()
+        d.patch_size    = (4, 4) 
+        file_num        = 3
+
+        dirpath1         = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\off'
+        dirpath2         = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\on'
+        dir_paths        = [dirpath1, dirpath2]
+        mask_values      = [-1,1]
+        rois             = [(400,560,420,580)]
+        xt,yt,xv,yv      = d.create_dataset(dir_paths, file_num, rois, mask_values)
+
+        p                = RoiClassifier()
+        ret              = p.set_data(xt,yt,xv,yv)
+        ret              = p.train()
+        ret              = p.predict(xv,yv)
+        
+        self.assertTrue(xv.shape[0] == yv.shape[0])
                
 
 
@@ -390,7 +444,8 @@ def RunTest():
     suite = unittest.TestSuite()
     #suite.addTest(TestRoiClassifier("test_save_load")) # ok
     #suite.addTest(TestRoiClassifier("test_data_show")) # ok
-    suite.addTest(TestRoiClassifier("test_train_simple")) # ok    
+    #suite.addTest(TestRoiClassifier("test_train_simple")) # ok 
+    suite.addTest(TestRoiClassifier("test_train_small_dataset")) #    
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
