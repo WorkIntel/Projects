@@ -1,5 +1,10 @@
 """
 Train a model created only by the linear layer written from scratch 
+
+use:
+C:\Users\udubin\Documents\Envs\keras\Scripts\activate.bat
+
+
 """
 
 # import libraries
