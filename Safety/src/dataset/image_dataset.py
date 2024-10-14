@@ -244,7 +244,7 @@ class DataSource:
 
         self.video_src       = None   # video source
         self.file_list       = None   # contrains bin file list
-
+        self.frame_count     = 0 
         self.tprint('Source is defined')
 
     def init_video(self, video_type = 11):
@@ -583,69 +583,6 @@ class DataSource:
         self.tprint(f'Testing point number  : {x_test.shape[0]}')
         return x_train, y_train, x_test, y_test 
 
-    def check_accuracy(self, pmsk, pmsk_pred):
-        #IOU for each class is..
-        # IOU = true_positive / (true_positive + false_positive + false_negative).
-        
-        #Using built in keras function
-
-        num_classes         = 2
-#        IOU_keras           = MeanIoU(num_classes=num_classes)  
-#        IOU_keras.update_state(pmsk, pmsk_pred)
-#        self.Print("Mean IoU = %f" %IOU_keras.result().numpy())        
-        #To calculate I0U for each class...
-#        values = np.array(IOU_keras.get_weights()).reshape(num_classes, num_classes)
-#        print(values)
-
-        mres = MeanIoU(pmsk, pmsk_pred)
-        self.tprint("Mean IoU = %f" %mres)
-        
-        
-        # class1_IoU = values[1,1]/(values[1,1] + values[1,2] + values[1,3] + values[1,4] + values[2,1]+ values[3,1]+ values[4,1])
-        # class2_IoU = values[2,2]/(values[2,2] + values[2,1] + values[2,1] + values[2,3] + values[1,2]+ values[3,2]+ values[4,2])
-        # class3_IoU = values[3,3]/(values[3,3] + values[3,1] + values[3,2] + values[3,4] + values[1,3]+ values[2,3]+ values[4,3])
-        # class4_IoU = values[4,4]/(values[4,4] + values[4,1] + values[4,2] + values[4,3] + values[1,4]+ values[2,4]+ values[3,4])
-        
-        # print("IoU Class 1 =", class1_IoU)
-        # print("IoU Class 2 =", class2_IoU)
-        # print("IoU Class 3 =", class3_IoU)
-        # print("IoU Class 4 =", class4_IoU) 
-        
-    def check_images(self, fmsk, y_pred):
-        # recover an image from the label
-  
-        hp,wp        = self.patch_size
-        h2, w2       = int(hp/2), int(wp/2)
-        
-        
-        # reshape
-        h,w         = fmsk.shape[0] - hp + 1, fmsk.shape[1] - wp + 1
-        lbl         = y_pred.reshape(h, w, -1).squeeze()
-        
-        # put
-        fmsk_pred     = np.zeros(fmsk.shape[:2])
-        fmsk_pred[h2:-h2+1,w2:-w2+1] = lbl
-        
-        return fmsk_pred
-
-    def train_model(self, fimg):
-        # creates model at a single levels
-        time_s                      = time()
-        
-        pimg, pmsk                  = self.CreateMultiplemageMaskPatches(fimg)
-        
-        mdl, pmsk_pred              = self.FilterXGB(pimg, pmsk)        
-        self.model                  = mdl
-        
-        self.Print('Train time : %f sec' %(time() - time_s))
-        
-        # check simple
-        self.CheckPixelError(pmsk, pmsk_pred)
-        
-        # check IoU
-        self.CheckAccuracy(pmsk, pmsk_pred)
-
-        return True
     
     def show_feature_mask(self, feat = None, mask = None, name = "Train"):
         # not debug mode - do nothing
@@ -733,15 +670,15 @@ class DataSource:
         cv.waitKey()
         return   
 
-    def show_data(self):
+    def show_data(self, frame = None):
         "draw relevant image data"
-        if self.frame_left is None or self.frame_right is None:
+        if frame is None:
             self.tprint('No images found')
             return False
             
         # deal with black and white
         #img_show    = np.concatenate((self.frame_left, self.frame_right), axis = 1)
-        img_show    = self.frame_color
+        img_show    = np.uint8(frame)
 
         while img_show.shape[1] > 2000:
             img_show    = cv.resize(img_show, (img_show.shape[1]>>1,img_show.shape[0]>>1), interpolation=cv.INTER_LINEAR)
@@ -767,52 +704,6 @@ class DataSource:
         else:
             log.info(txt)     
 
-    def test_prediction(self, fimg):
-        # test model 
-        time_s                      = time()
-        
-        pimg, pmsk                  = self.CreateMultiplemageMaskPatches(fimg)
-        
-        pmsk_pred                   = self.PredictXGB(pimg, pmsk)        
-        
-        self.Print('Test time : %f sec' %(time() - time_s))
-        
-        # check simple
-        self.CheckPixelError(pmsk, pmsk_pred)
-        
-        # check IoU
-        self.CheckAccuracy(pmsk, pmsk_pred)
-
-        return True   
-
-    def test_images_predictions(self, fimg):
-        # test model 
-        imNum,h,w,d                 = fimg.shape
-        fmsk_pred                   = np.zeros((imNum,h,w,1))
-        for k in range(imNum):
-            self.Print('Image %d ---------' %k)
-            time_s                  = time()        
-            fi                      = fimg[k,:,:,:]
-            fie                     = fi[np.newaxis,:,:,:]
-            pimg, pmsk              = self.CreateMultiplemageMaskPatches(fie)        
-            pmsk_pred               = self.PredictXGB(pimg, pmsk) 
-            fm_pred                 = self.check_images(fi, pmsk_pred)
-            fmsk_pred[k,:,:,:]      = fm_pred[:,:,np.newaxis]
-            
-            # check simple
-            self.CheckPixelError(pmsk, pmsk_pred)
-            
-            # check IoU
-            self.CheckAccuracy(pmsk, pmsk_pred)
-            
-            #self.ShowMaskComparison(mask_ref, mask_pred, level = 1
-        
-            self.Print('Test time : %f sec' %(time() - time_s))
-            
-        
-        self.show_feature_mask(fimg, fmsk_pred, name = 'Test - Predicted')
-        return True  
-
 # --------------------------------        
 #%% Tests
 class TestDataSource(unittest.TestCase):
@@ -834,8 +725,8 @@ class TestDataSource(unittest.TestCase):
         srcid   = 11
         ret     = p.init_video(srcid)
         while ret:
-            ret     = p.get_data()
-            ret     = p.show_data() and ret
+            ret,img     = p.get_data()
+            ret         = p.show_data(img) and ret
         p.finish()
         self.assertFalse(ret)
 
@@ -872,8 +763,8 @@ class TestDataSource(unittest.TestCase):
         #p.roi           = (400,500,500,600)
         p.roi           = (400,500,432,532)
         file_num        = 16
-        dirpath         = r'C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
-        #dirpath         = r'C:\Data\Safety\AGV\12_in_motion_both_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data'
+        #dirpath         = r'C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
+        dirpath         = r'C:\Data\Safety\AGV\12_in_motion_both_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data'
         img_dataset     = p.create_patches_from_images_in_directory(dirpath, file_num)
         p.show_patches(img_dataset)
         self.assertTrue(img_dataset.shape[0] == file_num)        
@@ -917,8 +808,8 @@ def RunTest():
     #suite.addTest(TestDataSource("test_create_multiple_image_mask_patches")) # ok
     #suite.addTest(TestDataSource("test_create_patches_from_images_in_directory")) # ok
     #suite.addTest(TestDataSource("test_show_patches")) # ok
-    #suite.addTest(TestDataSource("test_create_dataset_from_directories")) # ok
-    suite.addTest(TestDataSource("test_create_dataset"))
+    suite.addTest(TestDataSource("test_create_dataset_from_directories")) # ok
+    #suite.addTest(TestDataSource("test_create_dataset"))
     
     
 

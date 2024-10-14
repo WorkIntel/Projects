@@ -62,8 +62,9 @@ class RoiClassifier:
     def create_model(self):
         "creates simple NN model"
         # initialize a model 
+        dim_input       = self.X_train.shape[1]
         self.config     = [16, 16, 1]
-        self.model      = MLP(2, self.config) # 2-layer neural network
+        self.model      = MLP(dim_input, self.config) # 2-layer neural network
         #print(self.model)
         self.tprint("Model config : %s" %str(self.config))
         self.tprint("Model number of parameters", len(self.model.parameters()))
@@ -136,13 +137,13 @@ class RoiClassifier:
 
     def save_model(self):
         "saves the model/weight to a file"
+        sfile = 'model.dat'
         model_params = {
                         'model':  self.model,
                         'config': self.config
                         }
-        
 
-        fileObj = open('model.dat', 'wb')
+        fileObj = open(sfile, 'wb')
         pickle.dump(model_params,fileObj)
         fileObj.close()
         return True
@@ -221,7 +222,8 @@ class RoiClassifier:
         if data_type == 1:
             X, y = make_moons(n_samples=100, noise=0.1)
             y = y*2 - 1 # make y be -1 or 1
-        else:
+
+        elif data_type == 2: # 2D dataset
             # check that all are compatible
             point_num           = 10
             X00                 = np.random.rand(point_num,2)
@@ -231,6 +233,26 @@ class RoiClassifier:
             X10                 = np.random.rand(point_num,2)+np.array([1,0])
             y10                 = np.ones((point_num,1))
             X01                 = np.random.rand(point_num,2)+np.array([0,1])
+            y01                 = np.ones((point_num,1))  
+
+            X                   = np.vstack((X00,X01,X10,X11))
+            y                   = np.vstack((y00,y01,y10,y11))
+
+            # normalize the data to -1:1 and msks to 0:1
+            X                  = X - 1
+            y                  = y*2 - 1
+
+        else:
+            # check that all are compatible 8 D
+            point_num           = 50
+            dim_num             = 8
+            X00                 = np.random.rand(point_num,dim_num)
+            y00                 = np.zeros((point_num,1))
+            X11                 = np.random.rand(point_num,dim_num)+np.array([1]*dim_num)
+            y11                 = np.zeros((point_num,1))
+            X10                 = np.random.rand(point_num,dim_num)+np.array([[1,0]*int(dim_num/2)])
+            y10                 = np.ones((point_num,1))
+            X01                 = np.random.rand(point_num,dim_num)+np.array([[0,1]*int(dim_num/2)])
             y01                 = np.ones((point_num,1))  
 
             X                   = np.vstack((X00,X01,X10,X11))
@@ -253,10 +275,10 @@ class RoiClassifier:
         self.tprint(f'Testing point number  : {x_test.shape[0]}')
         return x_train, y_train, x_test, y_test 
 
-    def test_simple(self):
+    def test_simple(self, test_type = 2):
         # test model on 2D XOR data
         
-        self.X_train, self.y_train, self.X_test, self.y_test  = self.test_create_dataset(2)
+        self.X_train, self.y_train, self.X_test, self.y_test  = self.test_create_dataset(test_type)
 
         self.create_model()
         self.train()
@@ -337,59 +359,11 @@ class TestRoiClassifier(unittest.TestCase):
     def test_train_simple(self):
         "train on simple data"
         p       = RoiClassifier()
-        ret     = p.test_simple()
-        p.save_model()
+        ret     = p.test_simple(3)
+        #p.save_model()
         p.finish()
-        self.assertFalse(ret)
+        self.assertTrue(ret)
 
-    def test_transform_image_to_patch(self):
-        "transform image to multiple patch objects"
-        p               = DataSource()
-        p.patch_size    = (3, 3)
-        A               = np.arange(9*9).reshape(9,9,1).astype(np.float32)
-        pimg,pmsk       = p.transform_image_to_patch(A,3)
-        self.assertTrue(pimg.shape[0] > 0)
-
-
-    def test_create_multiple_image_mask_patches(self):
-        "testing data generation from multiple patches"
-        p               = DataSource()
-        p.patch_size    = (3, 3)
-        A               = np.arange(9*9*6).reshape(6,9,9,1).astype(np.float32)
-        pimg,pmsk       = p.create_multiple_image_mask_patches(A,1)
-        self.assertTrue(pimg.shape[0] > 0)
-        self.assertTrue(pimg.shape[0] == pmsk.shape[0])
-
-    def test_create_patches_from_images_in_directory(self):
-        "testing data set creation from multiple files in the directory"
-        p               = DataSource()
-        p.roi           = (200,500,250,550)
-        dirpath         = r'C:\Data\Safety\AGV\12_in_motion_no_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data'
-        img_dataset     = p.create_patches_from_images_in_directory(dirpath, 3)
-        #self.assertTrue(len(img_dataset) > 0)
-        self.assertTrue(img_dataset.shape[0] == 3)
-
-    def test_show_patches(self):
-        "testing data set show with multiple files"
-        p               = DataSource()
-        #p.roi           = (400,500,500,600)
-        p.roi           = (400,500,432,532)
-        file_num        = 16
-        dirpath         = r'C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
-        #dirpath         = r'C:\Data\Safety\AGV\12_in_motion_both_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data'
-        img_dataset     = p.create_patches_from_images_in_directory(dirpath, file_num)
-        p.show_patches(img_dataset)
-        self.assertTrue(img_dataset.shape[0] == file_num)        
-
-    def test_create_dataset_from_directories(self):
-        "data set creationm from a single directory"
-        p               = DataSource()
-        roi             = (400,500,432,532)
-        file_num        = 16
-        dirpath         = r'C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
-        pimg,pmsk       = p.create_dataset_from_directories([dirpath],file_num,roi, 1)
-        self.assertTrue(pimg.shape[0] == pmsk.shape[0])
-        print(pimg)
 
     def test_create_dataset(self):
         "data set creationm from a single directory"

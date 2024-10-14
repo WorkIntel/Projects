@@ -1005,8 +1005,8 @@ def RunTest():
     #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
     #suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
 
-    #suite.addTest(TestPowerEstimator("test_rosbag_data_show")) # ok
-    suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
+    suite.addTest(TestPowerEstimator("test_rosbag_data_show")) # ok
+    #suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
     
     
     runner = unittest.TextTestRunner()
@@ -1015,6 +1015,6 @@ def RunTest():
 if __name__ == '__main__':
     #print(__doc__)
 
-    #RunTest()
-    RunApp('iig').run()    
+    RunTest()
+    #RunApp('iig').run()    
 

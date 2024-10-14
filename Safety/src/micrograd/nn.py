@@ -46,6 +46,7 @@ class MLP(Module):
 
     def __init__(self, nin, nouts):
         sz = [nin] + nouts
+        print(f'NNet size : {sz}')
         self.layers = [Layer(sz[i], sz[i+1], nonlin=i!=len(nouts)-1) for i in range(len(nouts))]
 
     def __call__(self, x):
