@@ -1,14 +1,21 @@
 
+
 # import libraries
 import numpy as np
-from layer import FCLayer # Linear Layer 
+from fcnet.layer import FCLayer # Linear Layer 
 import matplotlib.pyplot as plt # For plotting the loss and accuracy
 
-# The following libraries are loaded for data loading and preprocessing 
-from keras.datasets import mnist
-from keras.utils import to_categorical
+ # importing common Use modules 
+import sys 
+sys.path.append(r'..\Utils\src')
+from common import log
 
-class CreateModel():
+# The following libraries are loaded for data loading and preprocessing 
+#from keras.datasets import mnist
+#from keras.utils import to_categorical
+
+#%% Main
+class Model():
     def __init__(self, input_size, output_size, hidden_size):
         """
         Creating the model using layers (written from scratch)
@@ -58,11 +65,11 @@ class CreateModel():
         # Loop over number of epochs 
         for epoch in range(n_epochs):
             # calculate the forward pass  
-            output = self.forward(inputs=inputs)
+            output  = self.forward(inputs=inputs)
             
             # Calculate the loss (Categorical Crossentropy)
             epsilon = 1e-10
-            loss = -np.mean(targets * np.log(output + epsilon))
+            loss    = -np.mean(targets * np.log(output + epsilon))
             
             # calculate the accuracy 
             predicted_labels = np.argmax(output, axis=1)
@@ -83,8 +90,9 @@ class CreateModel():
                 accuracy_log.append(accuracy)
             
             # print training results 
-            print(f"Epoch {epoch} // Loss: {loss} // Accuracy: {accuracy}")
+            self.tprint(f"Epoch {epoch} // Loss: {loss:.4f} // Accuracy: {accuracy:.4f}")
             
+    def show(self, n_epochs, loss_log, accuracy_log, plot_training_results=False):
         # Draw plot if needed 
         if plot_training_results == True:
             plt.plot(range(n_epochs), loss_log, label='Training Loss')
@@ -101,6 +109,16 @@ class CreateModel():
             plt.legend()
             plt.show()
 
+
+    def tprint(self, txt = '', level = 'I'):
+        if level == "I":
+            log.info(txt)
+        elif level == "W":
+            log.warning(txt)
+        elif level == "E":
+            log.error(txt)
+        else:
+            log.info(txt) 
             
 
 """ 
@@ -116,21 +134,16 @@ if __name__ == "__main__":
                 
     # load the dataset
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    print(y_train.shape)
-    print(y_train[:10])
-    
 
-    # # Flatten the images
-    # x_train = x_train.reshape((60000, 784))
+    # Flatten the images
+    x_train = x_train.reshape((60000, 784))
 
-    # # Normalize 
-    # x_train = x_train.astype("float32") / 255.0
+    # Normalize 
+    x_train = x_train.astype("float32") / 255.0
 
     # Preprocess the labels 
     y_train = to_categorical(y_train)
-    print(y_train.shape)
-    print(y_train[:10])
 
-    # # Create the Neural Network model
-    # nn = CreateModel(input_size=INPUT_SIZE, output_size=OUTPUT_SIZE, hidden_size=HIDDEN_SIZE)
-    # nn.train(x_train, y_train, initial_learning_rate=0.001, decay=0.001, n_epochs=100, plot_training_results=True)
+    # Create the Neural Network model
+    nn = Model(input_size=INPUT_SIZE, output_size=OUTPUT_SIZE, hidden_size=HIDDEN_SIZE)
+    nn.train(x_train, y_train, initial_learning_rate=0.001, decay=0.001, n_epochs=100, plot_training_results=True)

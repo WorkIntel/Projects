@@ -1,7 +1,7 @@
 
 '''
 
-ROI Classifier - classifies multiple patches and ROIs using NNet.
+ROI Classifier - classifies multiple patches and ROIs using NNet - Micrograd.
 Each patch is marked 0 or 1 according to the folder with laser Off or On.
 
 Support training and testing

@@ -228,7 +228,7 @@ class DataSource:
         self.roi             = None #[0,0,self.frame_size[1],self.frame_size[0]]
         self.patch_size      = (16, 16)  # h,w - patch to extract pixels from
         #elf.point_size      = (3,3)     # h,w - for mask
-        self.patch_step      = 2       # step between patches
+        self.patch_step      = 1       # step between patches
 
         self.video_src       = None   # video source
         self.file_list       = None   # contrains bin file list
