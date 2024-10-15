@@ -417,9 +417,9 @@ class DataSource:
         # check for dimensions
         patch_shape     = (h,w,ndim)
         totalPixelhNum  = np.prod(patch_shape)*nR*nC
-        if totalPixelhNum > 1e4:
-            step        = 2
-            self.tprint('The patch is too big or the image size is too big. Requires more than 1e8 pixels.','W')
+        if totalPixelhNum > 1e6:
+            step        = self.patch_step*2
+            self.tprint('The patch is too big or the image size is too big. Requires more than 1e6 pixels.','I')
             self.tprint('Reducing by factor 4','W')
         else:
             # compute step from the level
@@ -449,6 +449,7 @@ class DataSource:
         
         # debug
         #self.ShowFeatureMask(fmap, fmsk, name = str(ind))
+        self.tprint('Extracted %d patches from single ROI.' %patches_m.shape[0])
 
         return patches_i, patches_m
     
@@ -468,8 +469,8 @@ class DataSource:
             self.Print('Map channel size problem','E')
             return patches_img, patches_msk
         
-        h,w                     = self.patch_size       
-        patch_shape             = (h, w, nChannels)
+        h,w                         = self.patch_size       
+        patch_shape                 = (h, w, nChannels)
         
         # run over all the maps
         patches_img                 = np.zeros((0,np.prod(patch_shape)))

@@ -72,12 +72,12 @@ class Model():
             loss    = -np.mean(targets * np.log(output + epsilon))
             
             # calculate the accuracy 
-            predicted_labels = np.argmax(output, axis=1)
-            true_labels = np.argmax(targets, axis=1)
-            accuracy = np.mean(predicted_labels == true_labels)
+            predicted_labels    = np.argmax(output, axis=1)
+            true_labels         = np.argmax(targets, axis=1)
+            accuracy            = np.mean(predicted_labels == true_labels)
             
             # backward 
-            output_grad = 6 * (output - targets) / output.shape[0]
+            output_grad         = 1 * (output - targets) / output.shape[0]
             t += 1
             learning_rate = initial_learning_rate / (1 + decay * epoch)
             grad_3 = self.layer3.backward(output_grad, learning_rate, t)
@@ -90,7 +90,8 @@ class Model():
                 accuracy_log.append(accuracy)
             
             # print training results 
-            self.tprint(f"Epoch {epoch} // Loss: {loss:.4f} // Accuracy: {accuracy:.4f}")
+            if epoch % 5 == 0:
+                self.tprint(f"Epoch {epoch} // Loss: {loss:.4f} // Accuracy: {accuracy:.4f}")
             
     def show(self, n_epochs, loss_log, accuracy_log, plot_training_results=False):
         # Draw plot if needed 

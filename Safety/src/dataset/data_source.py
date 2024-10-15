@@ -120,6 +120,14 @@ class DataSource:
             self.video_src2 = fname
             fmode           = 'img' 
 
+        elif video_type == 41:
+            "pattern on - off from bag directory"
+            fname           = r"C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data\image_1726733188232460976_1280x720_step_1280_8uc1.bin"           
+            self.video_src  = fname
+            fname           = r"C:\Data\Safety\AGV\12_in_motion_no_prj_hall_ceramic_tile_sun\device_0_sensor_0_Infrared_1_image_data"
+            self.video_src2 = fname
+            fmode           = 'img' 
+
         else:
             self.tprint(f'Video type {video_type} is not supported','E')
             raise ValueError
@@ -233,8 +241,8 @@ class DataSource:
             return False
             
         # deal with black and white
-        #img_show    = np.concatenate((self.frame_left, self.frame_right), axis = 1)
-        img_show    = self.frame_color
+        img_show    = np.concatenate((self.frame_left, self.frame_right), axis = 1)
+        #img_show    = self.frame_color
 
         while img_show.shape[1] > 2000:
             img_show    = cv.resize(img_show, (img_show.shape[1]>>1,img_show.shape[0]>>1), interpolation=cv.INTER_LINEAR)

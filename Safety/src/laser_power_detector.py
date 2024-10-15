@@ -26,6 +26,7 @@ import cv2 as cv
 import unittest
 
 from dataset.data_source import DataSource
+from dataset.image_dataset import DataSource as DataSource2
 
  # importing common Use modules 
 import sys 
@@ -37,7 +38,8 @@ from common import log, RectSelector
 
 # see update function
 ESTIMATOR_OPTIONS = {1:'std',2:'std integrated',3:'contrast',4:'contrast',5:'contrast maxim',
-                     11:'saturate',12:'texture', 21:'laser on-off', 
+                     11:'saturate',12:'texture', 13:'edge', 
+                     21:'laser on-off', 
                      31:'iir', 
                      41:'dft-filter', 42:'spatial-filter',
                      51:'rosbag'}
@@ -159,7 +161,7 @@ class LaserPowerEstimator:
         img_sorted          = np.sort(img_roi, axis=None)
         cut_ind             = np.ceil(len(img_sorted)*percent).astype(np.int32)
         low_val             = np.mean(img_sorted[:cut_ind])
-        high_val            = np.mean(img_sorted[-5:])  # point peaks
+        high_val            = np.mean(img_sorted[-cut_ind:])  # point peaks
         #prob                = 1- (low_val)/(high_val + 1e-9)
         prob                = 1 - np.exp(-(high_val - low_val)/3)
         #self.tprint('Estim diff : %s' %str(high_val - low_val))
@@ -232,6 +234,26 @@ class LaserPowerEstimator:
         self.img_dbg[s:,s:] = img_edge  
         prob                = self.estimate_percentile_simple(img_edge, percent = 0.1)  
         return prob      
+    
+    def estimate_edge_probability(self, img_roi):
+        "estimates probability of the edge. Returns 1 if high edge probability of edge in any direction"
+        assert img_roi.max() < 257, 'image values must be in the ramge 0-255'
+        #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        s                   = 2
+        img_dx              = img_roi[:,s:] - img_roi[:,:-s]
+        img_dy              = img_roi[s:,:] - img_roi[:-s,:]
+        img_edge_mag        = (img_dx[s:,:])**2 + (img_dy[:,s:])**2
+        tot_mag             = img_edge_mag.sum()
+        #img_edge_ang        = np.arctan2(img_dy[:,s:],img_dx[s:,:])
+        dx                  = (img_dx[s:,:]*img_edge_mag).sum()/tot_mag
+        dy                  = (img_dy[:,s:]*img_edge_mag).sum()/tot_mag
+        img_edge            = np.abs(dx) + np.abs(dy)
+        # edge noticable difference is around 7
+        #prob                = np.minimum(1,img_edge.mean()/10)
+        self.img_dbg        = np.zeros_like(img_roi)
+        self.img_dbg[s:,s:] = img_edge_mag  
+        prob                = 1 - np.exp(-img_edge/7)  
+        return prob      
 
     def estimate_dot_pattern_dft(self, img_roi):
         "Detects dots in the image using dft. Returns 1 if dots are found"
@@ -276,15 +298,35 @@ class LaserPowerEstimator:
 
         # check if needed
         #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
-        s                   = 1
+        s                   = 2
         img_dx              = img_roi[s:-s,(s*2):] + img_roi[s:-s,:-(s*2)]
         img_dy              = img_roi[(s*2):,s:-s] + img_roi[:-(s*2),s:-s]
         img_dot             = img_roi[s:-s,s:-s] - (img_dx + img_dy)/4
 
         self.img_dbg        = np.zeros_like(img_roi)
         self.img_dbg[s:-s,s:-s]        = img_dot  
-        prob                = self.estimate_percentile_simple(img_dot, percent = 0.3)    
+        prob                = self.estimate_percentile_simple(img_dot, percent = 0.03)    
         return prob  
+    
+    def estimate_dot_pattern_spatial_nonlinear(self, img_roi):
+        "Detects dots in the image using gauss hat filter. Returns 1 if dots are found"
+        assert img_roi.max() < 256, 'image values must be in the ramge 0-255'
+        h, w                = img_roi.shape
+
+        # check if needed
+        #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        s                   = 2
+        img_dx              = img_roi[s:-s,(s*2):] + img_roi[s:-s,:-(s*2)]
+        img_dy              = img_roi[(s*2):,s:-s] + img_roi[:-(s*2),s:-s]
+        img_da              = img_roi[(s*2):,(s*2):] + img_roi[:-(s*2),:-(s*2)] # diag \
+        img_db              = img_roi[(s*2):,:-(s*2)] + img_roi[:-(s*2):,(s*2):] # diag /
+        #img_dot             = img_roi[s:-s,s:-s] - (img_dx + img_dy)/4
+        img_dot             = img_roi[s:-s,s:-s] - (img_dx + img_dy + img_da + img_db)/8
+
+        self.img_dbg        = np.zeros_like(img_roi)
+        self.img_dbg[s:-s,s:-s]        = img_dot  
+        prob                = self.estimate_percentile_simple(img_dot, percent = 0.01)    
+        return prob      
 
     def update(self, frame, rate = 0.1):
         "select differnet estimation techniques"
@@ -329,10 +371,16 @@ class LaserPowerEstimator:
             psnr        = self.estimate_saturation_probability(img_roi) 
             self.good   = psnr > 0.8     
 
-        elif self.estimator_type == 12: # edge probability    - ok    
+        elif self.estimator_type == 12: # texture probability    - ok    
         
             img_roi     = self.preprocess(frame)        
             psnr        = self.estimate_texture_probability(img_roi)    
+            self.good   = psnr > 0.8    
+
+        elif self.estimator_type == 13: # edge probability    -     
+        
+            img_roi     = self.preprocess(frame)        
+            psnr        = self.estimate_edge_probability(img_roi)    
             self.good   = psnr > 0.8                  
 
         elif self.estimator_type == 21: # on-off switch        
@@ -356,8 +404,10 @@ class LaserPowerEstimator:
         elif self.estimator_type == 42: # dot pattern using  spatial mask
                     
             img_roi     = self.preprocess(frame)        
-            psnr        = self.estimate_dot_pattern_spatial(img_roi)    
+            #psnr        = self.estimate_dot_pattern_spatial(img_roi)  
+            psnr        = self.estimate_dot_pattern_spatial_nonlinear(img_roi)   
             self.good   = psnr > 0.8  
+            #self.tprint(f'ROI Prob : {psnr:.2f}')
 
         elif self.estimator_type == 51: # ros bag images in left and right        
         
@@ -418,7 +468,7 @@ class LaserPowerEstimator:
         while vis.shape[1] < 128:
             vis         = cv.resize(vis, (vis.shape[0]<<1,vis.shape[1]<<1), interpolation=cv.INTER_LINEAR)
 
-        figure_name     = f'{self.estimator_type} - {self.idx}'        
+        figure_name     = f'{self.estimator_type}-{self.idx}'        
         cv.imshow(figure_name, vis)
         return True    
 
@@ -434,11 +484,14 @@ class LaserPowerEstimator:
         else:
             cv.line(vis, (x1, y1), (x2, y2), (0, 0, 255))
             cv.line(vis, (x2, y1), (x1, y2), (0, 0, 255))
-        vis  = draw_str(vis, (x1, y2+16), 'P: %.2f' % self.psr)   
+        vis  = draw_str(vis, (x1, y2+16), f'{self.estimator_type}:{self.psr:.2f}')
+        #vis  = draw_str(vis, (x1, y2+16), 'P: %.2f' % self.psr)   
         return vis 
 
     def show_scene(self, frame):
         "draw scene and ROI"
+
+        frame = np.uint8(frame)
         if len(frame.shape) > 2:
             vis     = frame.copy()
         else:
@@ -556,7 +609,7 @@ class TestPowerEstimator(unittest.TestCase):
     def test_video_percentile(self):
         "show video and measure infrared roi percentile"
         d       = DataSource()
-        p       = LaserPowerEstimator(12)
+        p       = LaserPowerEstimator(13)
         srcid   = 11
         rect    = (280,200,360,280)
         ret     = d.init_video(srcid)
@@ -611,8 +664,8 @@ class TestPowerEstimator(unittest.TestCase):
     def test_rosbag_data_with_pattern_switch(self):
         "image data with on off of two frames"
         srcid   = 32       # ros bag 31,32
-        #rect    = (280,200,360,280)
-        rect    = (700,50,780,100)
+        rect    = (280,200,360,280)
+        #rect    = (700,50,780,100)
         estid   = 51       # estimator id
 
         d       = DataSource()
@@ -628,10 +681,30 @@ class TestPowerEstimator(unittest.TestCase):
         p.finish()
         self.assertTrue(not ret)         
 
+    def test_rosbag_data_directory(self):
+        "show ros bag data"
+        d       = DataSource2()
+        ret     = d.init_video(41)
+
+        p       = LaserPowerEstimator(42)
+        #rect    = (480,400,560,480)
+        rect    = (400,500,450,540)
+        retp    = p.init_roi(rect)
+
+        while ret:
+            ret,img = d.get_data()
+            #ret     = d.show_data(img) and ret
+            retp    = p.update(img)
+            p.show_internal_state()
+            ret     = p.show_scene(img) and ret
+
+        p.finish()
+        self.assertTrue(not ret)         
+
 # --------------------------------
 #%% App
 class RunApp:
-    def __init__(self, video_src = 'iir', estimator_type = 41):
+    def __init__(self, video_src = 'iir', estimator_type = 1):
 
         #self.cap = video.create_capture(video_src)
         self.cap        = RealSense(video_src)
@@ -681,13 +754,15 @@ class RunApp:
         elif ch == 3:
             self.estim_type = 11  # saturation        
         elif ch == 4:
-            self.estim_type = 12  # edge texture
+            self.estim_type = 12  # edge / texture
         elif ch == 5:
             self.estim_type = 41  # many do pattern  
         elif ch == 6:
             self.estim_type = 42  # single dot     
         elif ch == 7:
-            self.estim_type = 21                                                       
+            self.estim_type = 21    
+        elif ch == 8:
+            self.estim_type = 13   # edge                                                              
 
         print(f'Estimator {ESTIMATOR_OPTIONS[self.estim_type]} with id {self.estim_type} is enabled')       
 
@@ -760,7 +835,9 @@ def RunTest():
     #suite.addTest(TestPowerEstimator("test_video_std")) # ok
     #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
     #suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
-    suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
+    #suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
+    suite.addTest(TestPowerEstimator("test_rosbag_data_directory")) 
+    
     
     runner = unittest.TextTestRunner()
     runner.run(suite)
@@ -769,5 +846,5 @@ if __name__ == '__main__':
     #print(__doc__)
 
     RunTest()
-    #RunApp('iig').run()    
+    #RunApp('iig',1).run()    
 

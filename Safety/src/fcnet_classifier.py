@@ -141,6 +141,7 @@ class RoiClassifier:
         ret1 = np.all(np.isin(self.y_train, [0,1]))
         ret2 = np.all(np.isin(self.y_test,  [0,1]))
         ret3 = self.X_train.shape[0] == self.y_train.shape[0]
+        self.tprint('Min max range of the data : %s-%s' %(str(self.X_train.min()), str(self.X_train.max())))
         return ret1 and ret2 and ret3
 
     def train(self):
@@ -159,7 +160,7 @@ class RoiClassifier:
         y_train_categorical = to_categorical(self.y_train,2)
 
         # optimization
-        self.model.train(self.X_train, y_train_categorical, initial_learning_rate=0.001, decay=0.001, n_epochs=100, plot_training_results=True)
+        self.model.train(self.X_train, y_train_categorical, initial_learning_rate=0.001, decay=0.001, n_epochs=500, plot_training_results=True)
 
         self.tprint('Training is done!')
         
@@ -414,13 +415,14 @@ class TestRoiClassifier(unittest.TestCase):
         "data set from robot in motion - train and test"
         d               = DataSource()
         d.patch_size    = (16, 16) 
+        d.patch_step    = 2
         file_num        = 1
 
         dirpath1         = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\off'
         dirpath2         = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\on'
         dir_paths        = [dirpath1, dirpath2]
         mask_values      = [0,1]
-        rois             = [(400,500,460,560)]
+        rois             = [(400,500,460,560)] #, (800,300,860,360)]
         xt,yt,xv,yv      = d.create_dataset(dir_paths, file_num, rois, mask_values)
 
         p                = RoiClassifier()
@@ -434,7 +436,7 @@ class TestRoiClassifier(unittest.TestCase):
         "data set from robot in motion - train and test"
         d               = DataSource()
         d.patch_size    = (16, 16) 
-        file_num        = 4
+        file_num        = 1
 
         dirpath1         = r'C:\Data\Safety\AGV\12_static_both_prj_covered_hall_carpet\12_static_both_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
         dirpath2         = r'C:\Data\Safety\AGV\12_static_no_prj_covered_hall_carpet\12_static_no_prj_covered_hall_carpet\device_0_sensor_0_Infrared_1_image_data'
@@ -461,8 +463,8 @@ def RunTest():
     #suite.addTest(TestRoiClassifier("test_save_load")) # nok
     #suite.addTest(TestRoiClassifier("test_data_show")) # ok
     #suite.addTest(TestRoiClassifier("test_train_simple")) # ok 
-    #suite.addTest(TestRoiClassifier("test_train_small_dataset")) #   
-    suite.addTest(TestRoiClassifier("test_train_static_dataset")) 
+    suite.addTest(TestRoiClassifier("test_train_small_dataset")) #   
+    #suite.addTest(TestRoiClassifier("test_train_static_dataset")) 
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
