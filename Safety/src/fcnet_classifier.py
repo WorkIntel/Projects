@@ -116,7 +116,7 @@ class RoiClassifier:
         # initialize a model 
 
         #INPUT_SIZE      = 784
-        HIDDEN_SIZE     = [32, 32]
+        HIDDEN_SIZE     = [8, 32, 16]
         OUTPUT_SIZE     = 2   
         dim_input       = self.X_train.shape[1]
         if self.config is None:
@@ -160,7 +160,7 @@ class RoiClassifier:
         y_train_categorical = to_categorical(self.y_train,2)
 
         # optimization
-        self.model.train(self.X_train, y_train_categorical, initial_learning_rate=0.001, decay=0.001, n_epochs=500, plot_training_results=True)
+        self.model.train(self.X_train, y_train_categorical, initial_learning_rate=0.0003, decay=0.001, n_epochs=1000, plot_training_results=True)
 
         self.tprint('Training is done!')
         
@@ -415,14 +415,14 @@ class TestRoiClassifier(unittest.TestCase):
         "data set from robot in motion - train and test"
         d               = DataSource()
         d.patch_size    = (16, 16) 
-        d.patch_step    = 2
-        file_num        = 1
+        d.patch_step    = 1
+        file_num        = 3
 
         dirpath1         = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\off'
         dirpath2         = r'C:\Users\udubin\Documents\Projects\Safety\data\laser_classifier\small\on'
         dir_paths        = [dirpath1, dirpath2]
         mask_values      = [0,1]
-        rois             = [(400,500,460,560)] #, (800,300,860,360)]
+        rois             = [(400,500,600,600)] #, (800,300,860,360)]
         xt,yt,xv,yv      = d.create_dataset(dir_paths, file_num, rois, mask_values)
 
         p                = RoiClassifier()

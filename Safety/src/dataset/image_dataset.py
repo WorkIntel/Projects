@@ -502,7 +502,7 @@ class DataSource:
         
         image_dataset   = []  #Many ways to handle data, you can use pandas. Here, we are using a list format.          
         # subset of the images
-        ri                  = np.random.permutation(file_num)[:image_num]
+        ri                  = np.arange(image_num) #np.random.permutation(file_num)[:image_num]
         for k in range(len(ri)):
 
             # Iterate over files and process them
@@ -561,6 +561,7 @@ class DataSource:
 
         # normalize the data to -1:1 and msks to 0:1
         pimgs               = pimgs/128 - 1
+        #pimgs               = pimgs/pimgs.ptp()
         pmsks               = pmsks
         self.tprint(f'Mak : minimal value : {pmsks.min()}, maximal value {pmsks.max()}')
 

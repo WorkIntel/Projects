@@ -24,9 +24,19 @@ class Model():
             output_size (int): Output size of the layer
             hidden_size (int): size of hidden layers
         """
-        self.layer1 = FCLayer(input_size=input_size, output_size=hidden_size[0], activation="relu")
-        self.layer2 = FCLayer(input_size=hidden_size[0], output_size=hidden_size[1], activation="relu")
-        self.layer3 = FCLayer(input_size=hidden_size[1], output_size=output_size, activation="softmax")
+        # self.layer1 = FCLayer(input_size=input_size, output_size=hidden_size[0], activation="relu")
+        # self.layer2 = FCLayer(input_size=hidden_size[0], output_size=hidden_size[1], activation="relu")
+        # self.layer3 = FCLayer(input_size=hidden_size[1], output_size=output_size, activation="softmax")
+
+        self.layers = []
+        layerIn     = FCLayer(input_size=input_size, output_size=hidden_size[0], activation="relu")
+        self.layers.append(layerIn)
+        for m in range(len(hidden_size)-1):
+            layerIn = FCLayer(input_size=hidden_size[m], output_size=hidden_size[m+1], activation="relu")
+            self.layers.append(layerIn)
+
+        layerIn     = FCLayer(input_size=hidden_size[-1], output_size=output_size, activation="softmax")
+        self.layers.append(layerIn)
         
     def forward(self, inputs):
         """
@@ -36,11 +46,25 @@ class Model():
             x (Tensor): A tensor consist of neumerical values of the data
         """
         # Calculate the output
-        output1 = self.layer1.forward(inputs)
-        output2 = self.layer2.forward(output1)
-        output3 = self.layer3.forward(output2)
+        # output1 = self.layer1.forward(inputs)
+        # output2 = self.layer2.forward(output1)
+        # outputs = self.layer3.forward(output2)
+
+        outputs = inputs
+        for m in range(len(self.layers)):
+            outputs = self.layers[m].forward(outputs)
         
-        return output3
+        return outputs
+    
+    def backward(self, learning_rate, output_grad, t):
+        "perform backward step"
+        grad = output_grad
+        for m in range(len(self.layers)):
+            n       = len(self.layers) - m - 1   # reverse order
+            grad    = self.layers[n].backward(grad, learning_rate, t)
+
+        return grad
+
         
     def train(self, inputs, targets, n_epochs, initial_learning_rate, decay, plot_training_results=False):
         """
@@ -65,11 +89,11 @@ class Model():
         # Loop over number of epochs 
         for epoch in range(n_epochs):
             # calculate the forward pass  
-            output  = self.forward(inputs=inputs)
+            output              = self.forward(inputs=inputs)
             
             # Calculate the loss (Categorical Crossentropy)
-            epsilon = 1e-10
-            loss    = -np.mean(targets * np.log(output + epsilon))
+            epsilon             = 1e-10
+            loss                = -np.mean(targets * np.log(output + epsilon))
             
             # calculate the accuracy 
             predicted_labels    = np.argmax(output, axis=1)
@@ -79,10 +103,11 @@ class Model():
             # backward 
             output_grad         = 1 * (output - targets) / output.shape[0]
             t += 1
-            learning_rate = initial_learning_rate / (1 + decay * epoch)
-            grad_3 = self.layer3.backward(output_grad, learning_rate, t)
-            grad_2 = self.layer2.backward(grad_3, learning_rate, t)
-            grad_1 = self.layer1.backward(grad_2, learning_rate, t)
+            learning_rate       = initial_learning_rate / (1 + decay * epoch)
+            # grad_3              = self.layer3.backward(output_grad, learning_rate, t)
+            # grad_2              = self.layer2.backward(grad_3, learning_rate, t)
+            # grad_1              = self.layer1.backward(grad_2, learning_rate, t)
+            grad                = self.backward(learning_rate, output_grad, t)
             
             # Add the loss and accuracy to the list 
             if plot_training_results == True:

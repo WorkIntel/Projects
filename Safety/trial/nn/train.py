@@ -118,13 +118,15 @@ if __name__ == "__main__":
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
     print(y_train.shape)
     print(y_train[:10])
+    print(x_train.shape)
+    print(x_train.min(),x_train.max())
     
 
-    # # Flatten the images
-    # x_train = x_train.reshape((60000, 784))
+    # Flatten the images
+    x_train = x_train.reshape((60000, 784))
 
-    # # Normalize 
-    # x_train = x_train.astype("float32") / 255.0
+    # Normalize 
+    x_train = x_train.astype("float32") / 255.0
 
     # Preprocess the labels 
     y_train = to_categorical(y_train)
