@@ -684,7 +684,7 @@ class TestPowerEstimator(unittest.TestCase):
     def test_rosbag_data_directory(self):
         "show ros bag data"
         d       = DataSource2()
-        ret     = d.init_video(41)
+        ret     = d.init_video(42)
 
         p       = LaserPowerEstimator(42)
         #rect    = (480,400,560,480)
@@ -846,5 +846,5 @@ if __name__ == '__main__':
     #print(__doc__)
 
     RunTest()
-    #RunApp('iig',1).run()    
+    #RunApp('iig',42).run()    
 
