@@ -98,6 +98,12 @@ class DataSource:
             fmode           = 'ii2' 
             self.video_src  = cv.VideoCapture(fname)
 
+        elif video_type == 15:
+            "with pattern on off"
+            fname           = r"C:\Users\udubin\Documents\Projects\Safety\data\laser_power\video_iir_000.mp4"
+            fmode           = 'iir' 
+            self.video_src  = cv.VideoCapture(fname)            
+
         elif video_type == 21:
             "pattern on - off"
             fname           = r"C:\Users\udubin\Documents\Projects\Safety\data\laser_power\video_ii2_001_ponoff.mp4"
@@ -163,7 +169,7 @@ class DataSource:
             self.frame_left  = frame[:,:,0] 
             self.frame_right = frame[:,:,1]
             self.frame_gray  = frame[:,:,2]  
-        elif self.mode == 'iig':
+        elif self.mode == 'iig' or self.mode == 'iir':
             self.frame_left  = frame[:,:,0] 
             self.frame_right = frame[:,:,1]
             self.frame_gray  = frame[:,:,2]   
@@ -202,14 +208,15 @@ class DataSource:
     def get_frame(self):
         "get a single frame from the stream"
         # as the video frame.
-        ret, frame              = self.video_src.read()  
+        ret, frame           = self.video_src.read()  
         if not ret:
             return ret, []
                 
         # convert channels
-        ret                     = self.convert_frame_from_input(frame)
+        ret                  = self.convert_frame_from_input(frame)
  
         frame_out            = frame
+        self.frame_color     = frame
         self.first_time      = False
         self.frame_count     = self.frame_count + 1
         return True, frame_out.astype(np.float32)   

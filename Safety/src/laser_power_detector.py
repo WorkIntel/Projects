@@ -69,6 +69,7 @@ class LaserPowerEstimator:
         # show / debug
         self.idx             = estimator_id         # figure name to show        
         self.estimator_type  = estimator_type        # which type of the estimation to use
+        self.estimator_name  = f'{self.estimator_type}-{self.idx}'
 
         #self.channel_num     = 1      # how many channels are processed - depends on the mode  
         self.frame_gray      = None   # process separate channels
@@ -100,8 +101,8 @@ class LaserPowerEstimator:
         self.img_dbg         = None   # debug  image
         self.win             = None   # for DFT method
 
-        estimator_name      = ESTIMATOR_OPTIONS[self.estimator_type]
-        self.tprint(f'New power estimator {estimator_name} and id {estimator_id} is defined')
+        proper_name      = ESTIMATOR_OPTIONS[self.estimator_type]
+        self.tprint(f'New power estimator {proper_name} and id {estimator_id} is defined')
 
     def init_roi(self, rect):
         "init ROI center and size and make it fft friendly"
@@ -468,8 +469,8 @@ class LaserPowerEstimator:
         while vis.shape[1] < 128:
             vis         = cv.resize(vis, (vis.shape[0]<<1,vis.shape[1]<<1), interpolation=cv.INTER_LINEAR)
 
-        figure_name     = f'{self.estimator_type}-{self.idx}'        
-        cv.imshow(figure_name, vis)
+        #figure_name     = f'{self.estimator_type}-{self.idx}'        
+        cv.imshow(self.estimator_name, vis)
         return True    
 
     def show_state(self, vis):
@@ -501,9 +502,9 @@ class LaserPowerEstimator:
         vis             = self.show_state(vis)
 
         # type of the estimator
-        estimator_name  = ESTIMATOR_OPTIONS[self.estimator_type]
-        figure_name     = f'{estimator_name} - {self.idx}'
-        cv.imshow(figure_name, vis)
+        #estimator_name  = ESTIMATOR_OPTIONS[self.estimator_type]
+        #figure_name     = f'{estimator_name} - {self.idx}'
+        cv.imshow(self.estimator_name, vis)
         ch  = cv.waitKey(30)
         ret = ch != ord('q')     
 
@@ -572,7 +573,11 @@ class LaserPowerEstimator:
     def finish(self):
         # Close down the video stream
         #self.video_src.release()
-        cv.destroyAllWindows()
+        #cv.destroyAllWindows()
+        try:
+            cv.destroyWindow(self.estimator_name) 
+        except:
+            print('No window found')
 
     def tprint(self, txt = '', level = 'I'):
         if level == "I":
@@ -640,6 +645,25 @@ class TestPowerEstimator(unittest.TestCase):
         #p.run_video_integration(str(srcid))
         p.finish()
         self.assertTrue(not ret) 
+
+    def test_video_iir(self):
+        "difference between i and red"
+        d       = DataSource()
+        srcid   = 15
+        ret     = d.init_video(srcid)
+
+        rect    = (280,200,360,280)
+        est_type= 31
+        p       = LaserPowerEstimator(est_type)
+        retp    = p.init_roi(rect)
+        while ret:
+            ret     = d.get_data()
+            ret     = d.show_data() and ret
+            retp    = p.update(d.frame_color)
+
+        #p.run_video_integration(str(srcid))
+        p.finish()
+        self.assertTrue(not ret)         
 
     def test_video_with_pattern_switch(self):
         "show video with pattern on off each frame"
@@ -756,13 +780,15 @@ class RunApp:
         elif ch == 4:
             self.estim_type = 12  # edge / texture
         elif ch == 5:
-            self.estim_type = 41  # many do pattern  
+            self.estim_type = 41  # many dot pattern  
         elif ch == 6:
             self.estim_type = 42  # single dot     
         elif ch == 7:
-            self.estim_type = 21    
+            self.estim_type = 21  # on-off  
         elif ch == 8:
-            self.estim_type = 13   # edge                                                              
+            self.estim_type = 13   # edge    
+        elif ch == 9:
+            self.estim_type = 31   # i-r                                                                       
 
         print(f'Estimator {ESTIMATOR_OPTIONS[self.estim_type]} with id {self.estim_type} is enabled')       
 
@@ -809,7 +835,8 @@ class RunApp:
                 self.paused = not self.paused
             elif ch == ord('c'):
                 if len(self.trackers) > 0:
-                    self.trackers.pop()
+                    t = self.trackers.pop()
+                    t.finish()
             elif ch == ord('u'):  
                 self.update_rate = 0.1 if self.update_rate < 0.001 else 0  
             elif ch == ord('p'):
@@ -825,7 +852,10 @@ class RunApp:
             elif ch == ord('n'):  # switch estimator types one by one
                 self.switch_estimator()
             elif 48 < ch and ch < 58 :  # switch estimator types by number
-                self.switch_estimator(ch - 48)         # start from 1                 
+                self.switch_estimator(ch - 48)         # start from 1 
+
+        print('Finished')
+        cv.destroyAllWindows()                
 
 # --------------------------------
 #%% Run Test
@@ -836,7 +866,9 @@ def RunTest():
     #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
     #suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
     #suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
-    suite.addTest(TestPowerEstimator("test_rosbag_data_directory")) 
+    suite.addTest(TestPowerEstimator("test_video_iir"))
+
+    #suite.addTest(TestPowerEstimator("test_rosbag_data_directory")) 
     
     
     runner = unittest.TextTestRunner()
@@ -846,5 +878,5 @@ if __name__ == '__main__':
     #print(__doc__)
 
     RunTest()
-    #RunApp('iig',42).run()    
+    #RunApp('iir',42).run()    
 

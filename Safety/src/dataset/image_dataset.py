@@ -482,6 +482,38 @@ class DataSource:
                 
 
         return patches_img, patches_msk
+ 
+    
+    def compute_channels(self, img_roi):
+        "Detects dots in the image using gauss hat filter"
+        assert img_roi.max() < 256, 'image values must be in the ramge 0-255'
+        #h, w                = img_roi.shape
+        img_out             = np.zeros_like(img_roi)
+
+        # check if needed
+        #img_roi             = np.log2(img_roi + 1.0)*32 # assume image is 0-255 range
+        s                   = 2
+        img_dx              = img_roi[s:-s,(s*2):] + img_roi[s:-s,:-(s*2)]
+        img_dy              = img_roi[(s*2):,s:-s] + img_roi[:-(s*2),s:-s]
+        img_dot             = img_roi[s:-s,s:-s] - (img_dx + img_dy)/4
+        #img_dx              = img_roi[:,s:] - img_roi[:,:-s]
+        #img_dy              = img_roi[s:,:] - img_roi[:-s,:]
+
+        img_out[s:-s,s:-s]    = img_dot
+        #img_out[:,s:,1]     = img_dx
+        #img_out[s:,:,2]     = img_dy
+
+        return img_out    
+    
+    def create_multiple_channels(self, image_dataset: np.array):
+        "use the notion of dots to enhance the image"
+        nImages, nR,nC, nC = image_dataset.shape
+        for n in range(nImages):
+            img_roi     = image_dataset[n,:,:,0]
+            img_feat    = self.compute_channels(img_roi)
+            image_dataset[n,:,:,0] = img_feat
+        return image_dataset
+
 
     def create_patches_from_images_in_directory(self, image_directory = '', image_num = 3):
         "loads multiple bin images from a specified directory"
@@ -518,6 +550,7 @@ class DataSource:
         # add 4 dim since Gray images only
         image_dataset = np.array(image_dataset)
         image_dataset = image_dataset[:,:,:,np.newaxis]
+        image_dataset = self.create_multiple_channels(image_dataset)
         return image_dataset
 
     def create_dataset_from_directories(self, dirpaths = [''], file_num = 4, roi = (100,100,132,132),  mask_value = 1):

@@ -211,11 +211,13 @@ class RealSense(object):
         elif self.mode == 'ii2':
             image_out       = np.concatenate((irl_image, irr_image), axis = 1)  
         elif self.mode == 'iid':
-            image_out       = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
+            #image_out       = np.stack((irl_image, irr_image, depth_scaled), axis = 2)  
+            image_out       = np.concatenate((irl_image, depth_scaled), axis = 1) 
         elif self.mode == 'iig':
             image_out       = np.stack((irl_image, irr_image, color_image[:,:,1]), axis = 2)                  
         elif self.mode == 'iir':
             image_out       = np.stack((irl_image, irr_image, color_image[:,:,0]), axis = 2) 
+            #image_out       = np.concatenate((irl_image, color_image[:,:,0]), axis = 1) 
         elif self.mode == 'dep':
             image_out       = depth_image                    
         return True, image_out
