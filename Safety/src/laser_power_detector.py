@@ -708,7 +708,7 @@ class TestPowerEstimator(unittest.TestCase):
     def test_rosbag_data_directory(self):
         "show ros bag data"
         d       = DataSource2()
-        ret     = d.init_video(42)
+        ret     = d.init_video(41) # 42
 
         p       = LaserPowerEstimator(42)
         #rect    = (480,400,560,480)
@@ -719,7 +719,7 @@ class TestPowerEstimator(unittest.TestCase):
             ret,img = d.get_data()
             #ret     = d.show_data(img) and ret
             retp    = p.update(img)
-            p.show_internal_state()
+            #p.show_internal_state()
             ret     = p.show_scene(img) and ret
 
         p.finish()
@@ -866,9 +866,9 @@ def RunTest():
     #suite.addTest(TestPowerEstimator("test_video_percentile")) # ok
     #suite.addTest(TestPowerEstimator("test_video_with_pattern_switch")) 
     #suite.addTest(TestPowerEstimator("test_rosbag_data_with_pattern_switch")) # ok
-    suite.addTest(TestPowerEstimator("test_video_iir"))
+    #suite.addTest(TestPowerEstimator("test_video_iir"))
 
-    #suite.addTest(TestPowerEstimator("test_rosbag_data_directory")) 
+    suite.addTest(TestPowerEstimator("test_rosbag_data_directory")) 
     
     
     runner = unittest.TextTestRunner()

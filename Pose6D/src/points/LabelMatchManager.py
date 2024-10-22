@@ -767,7 +767,7 @@ class LabelMatchManager:
         filterArray         = np.zeros((hp,wp,n_frames))
         for k in range(n_frames):
             templGray           = cv.cvtColor(templateArray[:,:,:,k],cv.COLOR_RGB2GRAY)
-            filterArray[:,:,k]= templGray            
+            filterArray[:,:,k]  = templGray            
         
         return filterArray #.astype(np.uint8) 
 
@@ -1527,8 +1527,9 @@ class TestLabelMatchManager(unittest.TestCase):
 
     def test_ComputeDecomposition(self):
         # not applicable
-        filePath    = r'C:\Users\udubin\Documents\Code\RAI\Objects\CupRGB-02\videos\object_0007'
-        lblId       = 7      
+        #filePath    = r'C:\Users\udubin\Documents\Code\RAI\Objects\CupRGB-02\videos\object_0007'
+        filePath    = r'C:\Users\udubin\Documents\Code\RAI\Objects\MatchBox-04\videos\object_0003'
+        lblId       = 1      
         d           = LabelMatchManager()
         d.MAX_FILES_TO_LOAD   = 64
 
@@ -1707,8 +1708,8 @@ if __name__ == '__main__':
     #singletest.addTest(TestLabelMatchManager("test_ConvertFilesToObjects")) # ok
     #singletest.addTest(TestLabelMatchManager("test_ConvertFilesToObjectsWithAugmentation")) # ok       
     #singletest.addTest(TestLabelMatchManager("test_ShowTemplatesPerLabel")) # ok
-    
-    singletest.addTest(TestLabelMatchManager("test_ComputeDecomposition"))
+    singletest.addTest(TestLabelMatchManager("test_ComputeDecomposition")) # ok
+
     #singletest.addTest(TestLabelMatchManager("test_ComputeCorrelation")) # 
     #singletest.addTest(TestLabelMatchManager("test_ComputeImageDistance"))
     #singletest.addTest(TestLabelMatchManager("test_ComputeWarpedCorrelation")) # ok
