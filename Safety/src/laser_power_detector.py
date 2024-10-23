@@ -842,7 +842,7 @@ class RunApp:
             elif ch == ord('p'):
                 self.cap.use_projector = not self.cap.use_projector
                 self.cap.switch_projector()   
-            elif ch == ord('p'):
+            elif ch == ord('t'):
                 self.projector_toggle = False
                 self.cap.use_projector = not self.cap.use_projector
                 self.cap.switch_projector()  

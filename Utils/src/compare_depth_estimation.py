@@ -26,6 +26,7 @@ from scipy.interpolate import RegularGridInterpolator
 import sys 
 sys.path.append(r'..\Utils\src')
 from opencv_realsense_camera import RealSense
+from common import log, RectSelector
 
 # import logging as log
 # log.basicConfig(stream=sys.stdout, level=log.DEBUG, format='[%(asctime)s.%(msecs)03d] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',  datefmt="%M:%S")
@@ -33,24 +34,24 @@ from opencv_realsense_camera import RealSense
 # log.getLogger('matplotlib').setLevel(log.WARNING)
 # log.getLogger('PIL').setLevel(log.WARNING)
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 #%% Logger
-import logging
-log         = logging.getLogger("robot")
-#formatter   = logging.Formatter('[%(asctime)s.%(msecs)03d] {%(filename)6s:%(lineno)3d} %(levelname)s - %(message)s', datefmt="%M:%S", style="{")
-formatter   = logging.Formatter('[%(asctime)s] - [%(filename)12s:%(lineno)3d] - %(levelname)s - %(message)s')
-log.setLevel("DEBUG")
+# import logging
+# log         = logging.getLogger("robot")
+# #formatter   = logging.Formatter('[%(asctime)s.%(msecs)03d] {%(filename)6s:%(lineno)3d} %(levelname)s - %(message)s', datefmt="%M:%S", style="{")
+# formatter   = logging.Formatter('[%(asctime)s] - [%(filename)12s:%(lineno)3d] - %(levelname)s - %(message)s')
+# log.setLevel("DEBUG")
 
-console_handler = logging.StreamHandler()
-console_handler.setLevel("DEBUG")
-console_handler.setFormatter(formatter)
-log.addHandler(console_handler)
+# console_handler = logging.StreamHandler()
+# console_handler.setLevel("DEBUG")
+# console_handler.setFormatter(formatter)
+# log.addHandler(console_handler)
 
-# file_handler = logging.FileHandler("main_app.log", mode="a", encoding="utf-8")
-# file_handler.setLevel("WARNING")
-# file_handler.setFormatter(formatter)
-# logger.addHandler(file_handler)
+# # file_handler = logging.FileHandler("main_app.log", mode="a", encoding="utf-8")
+# # file_handler.setLevel("WARNING")
+# # file_handler.setFormatter(formatter)
+# # logger.addHandler(file_handler)
 
 
 # ----------------------
@@ -67,9 +68,10 @@ class DepthEstimator:
 
         # params
         self.MIN_STD_ERROR   = 0.01
+        self.algo_type   = 1     # which algo to run - see update function
 
         # evaluate mean and std
-        self.rect        = [10,10,13,13]
+        self.rect        = [100,100,200,200]
         self.imgD_mean   = None
         self.imgD_std    = None
         self.imgC_mean   = None
@@ -77,6 +79,9 @@ class DepthEstimator:
 
         # stream
         self.cap         = None
+
+        # opencv stereo matcher
+        self.cv_stereo   = None 
 
     def init_image(self, img_type = 1):
         # create some images for test
@@ -120,7 +125,12 @@ class DepthEstimator:
         elif img_type == 14:
             self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE))
             self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE))
-            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE) )                       
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE) )      
+
+        elif img_type == 15:  # L-R switched
+            self.imgD = cv.pyrDown(cv.imread(r"C:\Data\Corr\imageL_iig_000.png", cv.IMREAD_GRAYSCALE))
+            self.imgL = cv.pyrDown(cv.imread(r"C:\Data\Corr\imageR_iig_000.png", cv.IMREAD_GRAYSCALE))
+            self.imgR = cv.pyrDown(cv.imread(r"C:\Data\Corr\imageL_iig_000.png", cv.IMREAD_GRAYSCALE) )                               
 
         elif img_type == 21:  # Test one image against image 
             image1      = np.random.randn(480, 640) * 60 + 60
@@ -133,7 +143,7 @@ class DepthEstimator:
             self.imgD = cv.imread(r"C:\Data\Corr\d3_Depth.png", cv.IMREAD_GRAYSCALE)
             self.imgL = cv.imread(r"C:\Data\Corr\l3_Infrared.png", cv.IMREAD_GRAYSCALE)
             #self.imgR = cv.imread(r"C:\Data\Corr\r3_Infrared.png", cv.IMREAD_GRAYSCALE)    
-            self.imgR = np.roll(self.imgL, np.array([2, 25]), axis=(0, 1)) 
+            self.imgR = np.roll(self.imgL, np.array([0, -16]), axis=(0, 1)) 
 
         else:
             self.tprint('Incorrect image type to load')        
@@ -164,19 +174,20 @@ class DepthEstimator:
         "reading data stream from RS"
         if self.cap is None:
             self.tprint('init stream first')
-            return
+            return False
         
         # frame is I1,I2, D data
         ret, frame = self.cap.read()
         if ret is False:
-            return
+            self.tprint('is your camera open/connected?')
+            return ret
         
         # assign
         self.imgL = frame[:,:,0]
         self.imgR = frame[:,:,1]
         self.imgD = cv.convertScaleAbs(frame[:,:,2], alpha=3) 
         #self.imgD = cv.normalize(frame[:,:,2], None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
-        return 
+        return True
       
     def init_roi(self, test_type = 0):
         "load the roi case"
@@ -241,16 +252,17 @@ class DepthEstimator:
 
     def depth_opencv(self):
         "computes depth from L and R images"
-        self.tprint('start processing')
+        self.tprint('Start processing')
         # Load the left and right images in grayscale
         left_image  = self.imgL
         right_image = self.imgR
 
         # Initialize the stereo block matching object
-        stereo = cv.StereoBM_create(numDisparities=128, blockSize=15)
+        if self.cv_stereo is None:
+            self.cv_stereo   = cv.StereoBM_create(numDisparities=128, blockSize=15)  
 
         # Compute the disparity map
-        disparity = stereo.compute(left_image, right_image)
+        disparity = self.cv_stereo.compute(left_image, right_image)
 
         # Normalize the disparity for display
         disparity_normalized = cv.normalize(disparity, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
@@ -260,33 +272,64 @@ class DepthEstimator:
         self.tprint('stop processing')
         return True
 
-    def depth_opencv_advanced(self):
+    def depth_opencv_advanced(self, imgL = None, imgR = None):
         "image computation using more elaborate features"   
-        self.tprint('start processing')
+        #self.tprint('Start computing disparity...')
+        if imgL is None:
+            imgL, imgR = self.imgL, self.imgR
 
 
-        # disparity range is tuned for 'aloe' image pair
-        window_size = 3
-        min_disp = 16
-        num_disp = 128 #112-min_disp
-        stereo = cv.StereoSGBM_create(minDisparity = min_disp,
-            numDisparities = num_disp,
-            blockSize = 16,
-            P1 = 8*3*window_size**2,
-            P2 = 32*3*window_size**2,
-            disp12MaxDiff = 1,
-            uniquenessRatio = 10,
-            speckleWindowSize = 100,
-            speckleRange = 32
-        )
-
+        if self.cv_stereo is None:
+            # disparity range is tuned for 'aloe' image pair
+            window_size = 3
+            min_disp = 0 # 16
+            num_disp = 112-min_disp
+            self.cv_stereo   = cv.StereoSGBM_create(minDisparity = min_disp,
+                numDisparities = num_disp,
+                blockSize = 16,
+                P1 = 8*3*window_size**2,
+                P2 = 32*3*window_size**2,
+                disp12MaxDiff = 1,
+                uniquenessRatio = 10,
+                speckleWindowSize = 100,
+                speckleRange = 32
+            )
         
-        disparity            = stereo.compute(self.imgL, self.imgR) #.astype(np.float32) / 16.0
+        disparity            = self.cv_stereo.compute(imgL, imgR) #.astype(np.float32) / 16.0
 
-        disparity_normalized = disparity/5 #(disparity - disparity.min())*16 #cv.normalize(disparity, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
+        # shpuild be /16
+        disparity_normalized = disparity.astype(np.float32)/4 #(disparity - disparity.min())*16 #cv.normalize(disparity, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
         self.imgC            = disparity_normalized.astype(np.uint8)
-        self.tprint('Computing disparity... Done')
-        return True
+        #self.tprint('Disparity Done')
+        return disparity_normalized
+    
+    def depth_opencv_pyramid(self):
+        "computing disparity in multiple scales"
+        #self.tprint('Multilevel disparity...')
+        levelNum            = 3
+        imgL, imgR          = self.imgL, self.imgR
+
+        # decompose
+        imgL_pyramid, imgR_pyramid, imgD_pyramid = [], [], []
+        for k in range(levelNum):
+            imgD            = self.depth_opencv_advanced(imgL,imgR)
+            imgL,imgR       = cv.pyrDown(imgL), cv.pyrDown(imgR)
+            imgD_pyramid.append(imgD)
+
+        # compute depth recurcively
+        imgD   = imgD_pyramid[-1]
+        for k in reversed(range(levelNum-1)):
+            imgDA           = cv.pyrUp(imgD)
+            imgD            = imgD_pyramid[k]
+            imgD_bad        = imgD < 64  # min_disparity * 4 since we scaled by 4 and not by 16     
+            #print(imgD_bad.sum()) 
+            imgD[imgD_bad]  = imgDA[imgD_bad]
+
+        self.imgC            = imgD.astype(np.uint8)
+        #self.tprint('Multilevel Done')
+        return imgD
+
+
     
     def dense_optical_flow(self):
         "image computation using more elaborate features"   
@@ -574,6 +617,15 @@ class DepthEstimator:
 
         return fp, flow        
 
+    def update(self):
+        "switch algo types"
+        if self.algo_type == 1:
+            self.depth_opencv_advanced()
+        elif self.algo_type == 2:
+            self.depth_opencv_pyramid()
+        else:
+            raise ValueError('not supported algo type')
+            
 
     # -----------------------------------------
     def show_noise(self):
@@ -598,14 +650,17 @@ class DepthEstimator:
         ch = cv.waitKey(1)
         return True
 
-    def show_images_depth(self):
+    def show_images_depth(self, do_show = True):
         "draw results of depth estimation"
         if self.imgD is None and self.imgC is None:
             self.tprint('No images found')
             return False
         
-        elif self.imgD is None:
+        elif self.imgD is None: # no data acquired
             img_show = self.imgC
+
+        elif self.imgC is None: # no data is processed
+            img_show = self.imgD            
 
         elif np.all(self.imgD.shape == self.imgC.shape):
             img_show = np.concatenate((self.imgD, self.imgC ), axis = 1)
@@ -614,9 +669,11 @@ class DepthEstimator:
             self.imgD = np.repeat(self.imgD[:,:,np.newaxis], 3, axis = 2)
             #img_show = self.imgC #np.concatenate((self.imgD, self.imgC ), axis = 1)
             img_show = np.concatenate((self.imgD, self.imgC ), axis = 1)
+
+        if not do_show:
+            return img_show
             
         # deal with black and white
-        
         if img_show.shape[1] > 1600:
             img_show = cv.pyrDown(img_show)
 
@@ -709,6 +766,16 @@ class TestDepthEstimator(unittest.TestCase):
         cv.waitKey()
         self.assertFalse(p.imgD is None)  
 
+    def test_depth_opencv_pyramid(self):
+        "single image decomposition"
+        p = DepthEstimator()
+        p.init_image(22)
+        p.depth_opencv_pyramid()
+        p.show_images_depth()
+        cv.waitKey()
+        self.assertFalse(p.imgD is None) 
+
+
     def test_video_stream_opencv_advanced(self):
         "depth compute"
         p   = DepthEstimator()
@@ -776,51 +843,62 @@ class TestDepthEstimator(unittest.TestCase):
         ch          = cv.waitKey()
         self.assertTrue(isOk)           
 
-
-
 # ----------------------
 #%% App
-class App:
-    def __init__(self, src):
-        self.cap   = RealSense()
-        self.cap.change_mode('dep')
+class RunApp:
+    def __init__(self):
+        self.tracker   = DepthEstimator()
+        self.tracker.algo_type = 1
+        self.tracker.init_stream()
+        self.tracker.read_stream()
 
-        self.frame = None
-        self.paused = False
-        self.tracker = DepthEstimator()
+        vis             = self.tracker.show_images_depth(False)
+        self.imshow_name= 'Depth Compare (p-Laser OnOff, (1:9)-Algos, space-Pause, q-Quit)'
+        cv.imshow(self.imshow_name, vis)
 
-        cv.namedWindow('plane')
+        self.rect_sel   = RectSelector(self.imshow_name, self.on_rect)        
+        self.frame      = None
+        self.paused     = False
+
+    def on_rect(self, rect):
+        "show noise"
+        self.tracker.init_roi(rect)
+
 
     def run(self):
         while True:
-            playing = not self.paused
-            if playing or self.frame is None:
-                ret, frame = self.cap.read()
+            if not self.paused:
+                ret = self.tracker.read_stream()
                 if not ret:
                     break
-                self.frame = frame.copy()
 
-            vis = self.frame.copy()
-            if playing:
-                tracked = self.tracker.track(self.frame)
-                for tr in tracked:
-                    cv.polylines(vis, [np.int32(tr.quad)], True, (255, 255, 255), 2)
-                    for (x, y) in np.int32(tr.p1):
-                        cv.circle(vis, (x, y), 2, (255, 255, 255))
+            # do compute
+            self.tracker.update()
+            
+            # show dual images - Left RS, Right Other
+            vis     = self.tracker.show_images_depth(False)              
 
-            self.rect_sel.draw(vis)
-            cv.imshow('plane', vis)
+            self.rect_sel.draw(vis) # draw rectangle
+            cv.imshow(self.imshow_name, vis)
             ch = cv.waitKey(1)
             if ch == ord(' '):
                 self.paused = not self.paused
-            if ch == ord('c'):
-                self.tracker.clear()
-            if ch == 27:
+            elif ch == ord('p'):
+                self.tracker.cap.use_projector = not self.tracker.cap.use_projector
+                self.tracker.cap.switch_projector()  
+            elif 48 < ch and ch < 58 :  # switch estimator types by number
+                self.tracker.algo_type = (ch - 48)                                
+            elif ch == 27 or ch == ord('q'):
                 break
+            else:
+                pass
+                #print('Unknown character - are you in right language?')
 
-if __name__ == '__main__':
-    #print(__doc__)
+        print('Finished')
+        cv.destroyAllWindows()     
 
+#%% Run Test
+def RunTest():
     #unittest.main()
     suite = unittest.TestSuite()
     #suite.addTest(TestDepthEstimator("test_show_images_left_right"))
@@ -828,11 +906,19 @@ if __name__ == '__main__':
     #suite.addTest(TestDepthEstimator("test_depth_opencv"))
     #suite.addTest(TestDepthEstimator("test_depth_opencv_advanced"))
     #suite.addTest(TestDepthEstimator("test_video_stream_opencv_advanced")) # ok
+    suite.addTest(TestDepthEstimator("test_depth_opencv_pyramid"))
+    
     #suite.addTest(TestDepthEstimator("test_dense_optical_flow")) # so so
     #suite.addTest(TestDepthEstimator("test_show_flow"))
     #suite.addTest(TestDepthEstimator("test_block_matching"))
     #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence"))
-    suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
+    #suite.addTest(TestDepthEstimator("test_block_matching_with_confidence_2d"))
     runner = unittest.TextTestRunner()
     runner.run(suite)
+
+if __name__ == '__main__':
+    #print(__doc__)
+
+    #RunTest()
+    RunApp().run()       
 
